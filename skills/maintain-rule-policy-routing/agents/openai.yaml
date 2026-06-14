@@ -1,7 +1,0 @@
-interface:
-  display_name: "Rule Policy Routing"
-  short_description: "Maintain rule-provider to policy routing across ProxyConfig clients."
-  default_prompt: "Use $maintain-rule-policy-routing to add, remove, or remap service rules with a policy audit first."
-
-policy:
-  allow_implicit_invocation: true

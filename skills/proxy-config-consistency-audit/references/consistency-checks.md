@@ -16,6 +16,6 @@
 
 ## Suggested Follow-Up Skills
 
-- Use `maintain-proxy-groups` for provider/group fixes.
-- Use `maintain-proxy-dns-routing` for DNS and AirportServers fixes.
-- Use `maintain-rule-policy-routing` for undefined or misrouted rule targets.
+- Use `proxy-groups` for provider/group fixes.
+- Use `proxy-dns-routing` for DNS and AirportServers fixes.
+- Use `proxy-rule-policy-routing` for undefined or misrouted rule targets.

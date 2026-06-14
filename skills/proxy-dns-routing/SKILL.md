@@ -1,5 +1,5 @@
 ---
-name: maintain-proxy-dns-routing
+name: proxy-dns-routing
 description: Maintain DNS routing in the user's ProxyConfig repository for Egern, Mihomo, and Surge. Use when updating AirportServers DNS forwarding, airport node-domain DNS policies, provider-specific DoH overrides, DNS upstream groups, Surge Host mappings, Egern dns.forward rules, Mihomo proxy-server-nameserver-policy entries, or DNS leak/HTTPDNS-related routing behavior. Always inspect AirportServers references and run the bundled DNS audit before editing.
 ---
 

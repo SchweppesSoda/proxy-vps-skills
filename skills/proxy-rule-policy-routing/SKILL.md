@@ -1,5 +1,5 @@
 ---
-name: maintain-rule-policy-routing
+name: proxy-rule-policy-routing
 description: Maintain rule-provider and policy routing in the user's ProxyConfig repository for Egern, Mihomo, Surge, and Loon-style policy groups. Use when adding, removing, reordering, or remapping service rules such as Apple Push, HTTPDNS, AI Suite, streaming media, CN Mainland TV, Speedtest, Telegram, Microsoft, Apple, Google FCM, or custom MyProxy/MyDirect rule sets. Always audit rule targets against policy group definitions before editing.
 ---
 

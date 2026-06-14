@@ -1,7 +1,7 @@
 interface:
   display_name: "Proxy Group Maintenance"
   short_description: "Maintain ProxyConfig groups and provider sources safely."
-  default_prompt: "Use $maintain-proxy-groups to add, remove, split, rename, or re-source proxy groups in ProxyConfig with a reference audit first."
+  default_prompt: "Use $proxy-groups to add, remove, split, rename, or re-source proxy groups in ProxyConfig with a reference audit first."
 
 policy:
   allow_implicit_invocation: true

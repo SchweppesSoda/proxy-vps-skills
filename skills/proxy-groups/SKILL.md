@@ -1,5 +1,5 @@
 ---
-name: maintain-proxy-groups
+name: proxy-groups
 description: Maintain proxy and policy groups plus provider source metadata in the user's ProxyConfig repository for MIHOMO/Mihomo, Surge, and Egern. Use when adding, deleting, renaming, splitting, or re-sourcing airport providers, self-hosted VPS groups, relay/dialer groups, region groups, MassData/Others pools, service policy groups, provider URLs, provider paths, Sub-Store collection names, node prefixes, or external-policy-name-prefix values. Especially for requests involving examples like TAG airports, PO0 SG, OIX/OixCloud removal, DMIT PRO removal, Core JP/Edge JP split, or provider source/prefix/path changes. Always audit group definitions and references before editing and ask for behavior choices such as select, fallback, url-test/auto_test, or smart when not specified.
 ---
 

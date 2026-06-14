@@ -1,5 +1,5 @@
 ---
-name: audit-proxy-config-consistency
+name: proxy-config-consistency-audit
 description: Audit the user's ProxyConfig repository for cross-client consistency without editing files. Use when checking whether Egern, Mihomo, and Surge have mismatched provider inventories, missing airport region groups, stale references after deletions, undefined rule policy targets, missing Others/MassData/Speedtest coverage, or general drift after proxy, DNS, or rule changes. This skill is read-only and should be used before or after risky ProxyConfig edits.
 ---
 
