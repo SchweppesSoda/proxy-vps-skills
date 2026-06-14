@@ -16,6 +16,13 @@ Prefer split Surge files for targeted group edits when they are the maintained s
 
 Airport providers are subscription-backed pools such as `MESL`, `BitzNet`, `SNTP`, `LinkCube`, `Flower`, `CTC02`, `LiangXin`, and `OixCloud`. Inventory differs by client: verify in each file instead of assuming parity.
 
+Provider source metadata is part of provider maintenance:
+
+- Mihomo uses `proxy-providers.<Provider>.url`, local `path`, and optional `override.additional-prefix`.
+- Surge uses `Provider = select, policy-path=...` and optional `external-policy-name-prefix=...`.
+- Egern uses `external` policy groups with `urls`, filters, and hidden provider pools.
+- Source-only updates should not rename visible groups unless explicitly requested.
+
 Self-hosted providers are VPS or private pools such as `PO0_HK`, `PO0_TW`, `PO0_JP`, `PO0_US`, `DMIT_PRO`, `DMIT_EB`, and `CUSTOM_JP`. Visible groups include names such as `PO0-HK`, `DMIT-PRO`, `Core JP`, and `Edge JP`.
 
 Relay/Dialer groups are candidates used as previous hops or dialer proxies for Residential/Landed traffic. Mihomo names are Dialer-oriented; Surge and Egern use Relay-oriented names. They include PO0, Core/Edge, DMIT, regional auto/manual groups, `Others`, and `DIRECT`.
@@ -70,6 +77,13 @@ Add an airport such as `TAG`:
 - Add provider to `Others` and update the region exclusion regex if needed.
 - Add DNS exceptions only if the provider requires custom node-domain resolution.
 - Preserve provider ordering relative to similar airports.
+
+Update a provider source:
+
+- Audit old and new source aliases: Sub-Store collection name, gist raw name, provider key, cache path, prefix, and visible child group prefix.
+- Change only source metadata when the visible provider/group name is stable.
+- Keep cache paths deterministic and lowercase where that is the existing Mihomo style.
+- Preserve prefix style unless the request explicitly changes it.
 
 Delete an airport such as `OIX`/`OixCloud`:
 

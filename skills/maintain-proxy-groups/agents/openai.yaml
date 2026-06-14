@@ -1,7 +1,7 @@
 interface:
   display_name: "Proxy Group Maintenance"
-  short_description: "Maintain MIHOMO, Surge, and Egern proxy groups safely."
-  default_prompt: "Use $maintain-proxy-groups to add, remove, or split proxy groups in ProxyConfig with a reference audit first."
+  short_description: "Maintain ProxyConfig groups and provider sources safely."
+  default_prompt: "Use $maintain-proxy-groups to add, remove, split, rename, or re-source proxy groups in ProxyConfig with a reference audit first."
 
 policy:
   allow_implicit_invocation: true

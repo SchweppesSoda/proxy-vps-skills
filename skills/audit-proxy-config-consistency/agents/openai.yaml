@@ -1,0 +1,7 @@
+interface:
+  display_name: "Proxy Config Audit"
+  short_description: "Read-only consistency audit for ProxyConfig providers, regions, and rules."
+  default_prompt: "Use $audit-proxy-config-consistency to check ProxyConfig drift before or after edits."
+
+policy:
+  allow_implicit_invocation: true

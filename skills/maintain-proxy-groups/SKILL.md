@@ -1,13 +1,13 @@
 ---
 name: maintain-proxy-groups
-description: Maintain proxy and policy groups in the user's ProxyConfig repository for MIHOMO/Mihomo, Surge, and Egern. Use when adding, deleting, renaming, or splitting airport providers, self-hosted VPS groups, relay/dialer groups, region groups, MassData/Others pools, or service policy groups; especially for requests involving examples like TAG airports, PO0 SG, OIX/OixCloud removal, DMIT PRO removal, or Core JP/Edge JP split. Always audit group definitions and references before editing and ask for behavior choices such as select, fallback, url-test/auto_test, or smart when not specified.
+description: Maintain proxy and policy groups plus provider source metadata in the user's ProxyConfig repository for MIHOMO/Mihomo, Surge, and Egern. Use when adding, deleting, renaming, splitting, or re-sourcing airport providers, self-hosted VPS groups, relay/dialer groups, region groups, MassData/Others pools, service policy groups, provider URLs, provider paths, Sub-Store collection names, node prefixes, or external-policy-name-prefix values. Especially for requests involving examples like TAG airports, PO0 SG, OIX/OixCloud removal, DMIT PRO removal, Core JP/Edge JP split, or provider source/prefix/path changes. Always audit group definitions and references before editing and ask for behavior choices such as select, fallback, url-test/auto_test, or smart when not specified.
 ---
 
 # Maintain Proxy Groups
 
 ## Core Rule
 
-Treat every group change as a reference-graph change. Before editing, identify the group's definitions, direct consumers, aggregate consumers, service consumers, rules, DNS exceptions, comments, and generated/split counterparts across Mihomo, Surge, and Egern.
+Treat every group or provider-source change as a reference-graph change. Before editing, identify the group's definitions, provider source entries, direct consumers, aggregate consumers, service consumers, rules, DNS exceptions, comments, and generated/split counterparts across Mihomo, Surge, and Egern.
 
 If the user says the task is hypothetical, inspect and explain only; do not modify ProxyConfig.
 
@@ -41,6 +41,13 @@ For a self-hosted add like `PO0 SG`, ask:
 - Visible group name, flag, provider key, icon/prefix, and whether it should be flattened.
 - Whether to include it in `Proxy`/`AllRegions`, mass lists, Relay/Dialer candidates, `Emby`, `Speedtest`, `AI Suite`, or only manual groups.
 
+For provider source maintenance, ask:
+
+- Whether this is a source-only update or whether visible groups should also be renamed.
+- Client-specific source strings: Mihomo `url`/`path`, Surge `policy-path`, Egern `urls`.
+- Prefix policy: preserve the existing node prefix, change it, remove it, or keep client-specific prefixes.
+- Whether stale source names such as old Sub-Store collection names, gist raw names, cache paths, and comments should be removed.
+
 For deletion or splitting, ask how to handle consumers:
 
 - Remove from consumers, replace with a new group, or keep an alias temporarily.
@@ -50,11 +57,12 @@ For deletion or splitting, ask how to handle consumers:
 ## Edit Workflow
 
 1. Build an audit report for all raw names and aliases. Include normalized forms: spaces, hyphens, underscores, provider suffixes, and emoji-stripped names.
-2. Classify the target as airport provider, self-hosted provider, relay/dialer, region aggregate, service group, rule target, or DNS/plugin name.
-3. Draft the exact edit set per client. Do not assume Mihomo, Surge, and Egern have identical provider inventories.
-4. Apply minimal edits in the established section order. Keep repeated service lists in sync where the repo intentionally does not use anchors.
-5. Re-run `audit_proxy_refs.py` for old and new names.
-6. Report unresolved references, intentional leftovers, and any client skipped because it lacks the corresponding structure.
+2. Classify the target as airport provider, self-hosted provider, relay/dialer, region aggregate, service group, rule target, DNS/plugin name, or provider source metadata.
+3. For source-only updates, separate provider source metadata from visible policy/group names; do not rename visible groups unless requested.
+4. Draft the exact edit set per client. Do not assume Mihomo, Surge, and Egern have identical provider inventories or source naming.
+5. Apply minimal edits in the established section order. Keep repeated service lists in sync where the repo intentionally does not use anchors.
+6. Re-run `audit_proxy_refs.py` for old and new names, including old source aliases and cache path fragments.
+7. Report unresolved references, intentional leftovers, and any client skipped because it lacks the corresponding structure.
 
 ## Validation
 

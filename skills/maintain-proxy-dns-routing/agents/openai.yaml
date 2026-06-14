@@ -1,0 +1,7 @@
+interface:
+  display_name: "Proxy DNS Routing"
+  short_description: "Maintain AirportServers and cross-client DNS routing in ProxyConfig."
+  default_prompt: "Use $maintain-proxy-dns-routing to update AirportServers or provider DNS routing with an audit first."
+
+policy:
+  allow_implicit_invocation: true
