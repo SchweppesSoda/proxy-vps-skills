@@ -365,7 +365,7 @@ def extract_egern_rules(repo: Path, path: Path) -> list[RuleRef]:
         if re.match(r"^  -\s+", line):
             flush()
             entry = [(index, line)]
-        elif entry:
+        elif entry and line.strip() and not line.lstrip().startswith("#"):
             entry.append((index, line))
     flush()
     return refs
@@ -533,6 +533,7 @@ def is_ip_rule(item: RuleRef) -> bool:
             "cnip",
             "domesticips",
             "chinaasn",
+            "asnchina",
         )
     )
 
@@ -541,7 +542,7 @@ def classify_rule(item: RuleRef) -> tuple[int, str] | None:
     readable, flat = rule_blob(item)
     policy_flat = flat_text(item.policy)
 
-    if item.kind == "FINAL" or item.rule == "MATCH":
+    if item.kind in {"FINAL", "DEFAULT"} or item.rule == "MATCH":
         return 170, "Final"
     if (
         item.kind == "SSID"
@@ -592,7 +593,17 @@ def classify_rule(item: RuleRef) -> tuple[int, str] | None:
             return 156, "GoogleIP"
         if "proxy" in flat:
             return 157, "ProxyIP"
-        if any(token in flat for token in ("china", "cnip", "domesticips", "geoipcn")):
+        if item.kind == "GEOIP" or any(
+            token in flat
+            for token in (
+                "china",
+                "cnip",
+                "domesticips",
+                "geoipcn",
+                "chinaasn",
+                "asnchina",
+            )
+        ):
             return 160, "ChinaIP"
         return 159, "OtherIP"
 

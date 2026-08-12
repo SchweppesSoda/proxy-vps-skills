@@ -112,6 +112,40 @@ rule-providers:
         self.assertEqual(len(violations), 1)
         self.assertIn("ipcidr", violations[0].reason)
 
+    def test_egern_comments_do_not_change_rule_classification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            path = repo / "Egern" / "AutoEgern.yaml"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                """rules:
+  - rule_set:
+      match: \"https://example.test/Domestic.list\"
+      policy: Domestic
+      update_interval: 86400
+  # --- service IP before broad CN IP ---
+  - rule_set:
+      match: \"https://raw.githubusercontent.com/SchweppesSoda/CustomRules/refs/heads/auto-build/Surge/IP/Telegram.list\"
+      policy: Telegram
+""",
+                encoding="utf-8",
+            )
+            refs = audit.extract_egern_rules(repo, path)
+            self.assertFalse(audit.is_ip_rule(refs[0]))
+            self.assertTrue(audit.is_ip_rule(refs[1]))
+
+    def test_china_asn_is_a_cn_ip_rule(self) -> None:
+        item = audit.RuleRef(
+            "Loon",
+            "Loon/Test.conf",
+            1,
+            "Domestic",
+            "https://example.test/ASN.China.list",
+            "REMOTE-RULE",
+            "https://example.test/ASN.China.list, policy=Domestic",
+        )
+        self.assertEqual(audit.classify_rule(item), (160, "ChinaIP"))
+
 
 if __name__ == "__main__":
     unittest.main()
