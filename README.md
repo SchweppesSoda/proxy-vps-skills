@@ -2,7 +2,7 @@
 
 这是给 `ProxyConfig` 仓库使用的 Codex skills 集合，目标是把代理配置维护中容易漏改、容易跨客户端不一致的操作沉淀成可复用工作流。
 
-当前重点覆盖 Egern、Mihomo、Surge 的代理组、DNS 路由、规则策略和一致性审计。Surge split config 同步不在本仓库实现，因为已经由专门的 GitHub Action 处理。
+当前重点覆盖 Egern、Mihomo、Stash、Surge、Loon 的代理组、DNS 路由、规则策略和一致性审计。Surge split config 同步不在本仓库实现，因为已经由专门的 GitHub Action 处理。
 
 ## 命名约定
 
@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | `proxy-groups` | 维护代理组、机场 provider、自建 VPS 组、地区组、Relay/Dialer、`MassData`、`Others`，并维护 provider source 元数据。 | 新增/删除/重命名机场；新增 `PO0 SG`；拆分 `Core JP`/`Edge JP`；修改 provider URL、Sub-Store 名称、cache path、节点 prefix。 |
 | `proxy-dns-routing` | 维护 DNS 解析路径，重点关注 AirportServers、机场节点域名、provider 专用 DoH、Egern `dns.forward`、Mihomo `proxy-server-nameserver-policy`、Surge Host 映射。 | 更新 AirportServers 引用；给机场节点域名指定 DoH；排查节点域名解析路径；避免代理启动前 DNS 依赖错误。 |
-| `proxy-rule-policy-routing` | 维护 rule-provider 到 policy group 的路由关系和规则顺序。 | 新增/调整 `Apple Push`、`HTTPDNS`、`AI Suite`、流媒体、`Speedtest`、`MyProxy`/`MyDirect` 等规则；检查规则是否指向存在的策略组。 |
+| `proxy-rule-policy-routing` | 维护 rule-provider 到 policy group 的路由关系和跨客户端规则顺序。 | 新增/调整 `AI Suite`、`PayPal`、`Banking`、`Crypto`、`Apple Push`、`HTTPDNS`、流媒体、`Speedtest`、`MyProxy`/`MyDirect` 等规则；检查规则目标与优先级契约。 |
 | `proxy-config-consistency-audit` | 只读一致性审计，不直接修改配置。 | 检查 Egern/Mihomo/Surge provider 是否不一致；地区组是否缺 HK/TW/SG/JP/US；删除机场后是否还有残留引用；规则是否指向不存在的策略组。 |
 
 ## 推荐用法
@@ -30,7 +30,7 @@
 ```
 
 ```text
-用 $proxy-rule-policy-routing 调整 Apple Push 规则顺序。
+用 $proxy-rule-policy-routing 把 PayPal、Banking、Crypto 连续放到 AI 后面，并检查所有客户端顺序。
 ```
 
 ```text
@@ -50,7 +50,7 @@
 ```
 
 ```powershell
-& "<python>" "skills/proxy-rule-policy-routing/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --policy "Apple Push" --policy HTTPDNS
+& "<python>" "skills/proxy-rule-policy-routing/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig"
 ```
 
 ```powershell
