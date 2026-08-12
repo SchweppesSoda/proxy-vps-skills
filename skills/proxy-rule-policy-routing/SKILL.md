@@ -17,6 +17,12 @@ AI rules → PayPal → Banking → Crypto → other service rules
 
 `PayPal`, `Banking`, and `Crypto` must be active, contiguous, and in that exact order immediately after the last AI rule. Comments and blank lines may separate sections; unrelated active rules may not split the sequence.
 
+The complete domain/media/platform/IP order is defined in
+`references/rule-policy-model.md` and is normative. In particular, the Apple
+block precedes the regional TV block; Asian TV precedes Global TV; CN Mainland
+TV is the last media block; and all service IP rules follow every domain rule
+but precede CN IP/ASN/GEOIP.
+
 Do not edit Surge split files directly. Edit `Surge/AutoSurge.conf`, report local split drift, and leave synchronization to the repository's GitHub Action.
 
 ## First Steps
@@ -28,6 +34,7 @@ Do not edit Surge split files directly. Edit `Surge/AutoSurge.conf`, report loca
 ```powershell
 & "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig"
 & "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --policy PayPal --policy Banking --policy Crypto
+& "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --require-generated-sync
 ```
 
 4. Search definitions and references across `Mihomo/`, `Stash/`, `Surge/`, `Loon/`, and `Egern/` before editing.
@@ -53,7 +60,10 @@ Ask only for decisions the repository and the canonical model cannot provide:
    - Loon: Full and Lite remote rules plus service groups when applicable.
 4. Preserve intentionally minimal clients. Do not add a missing service to Safe or Lite solely for symmetry; when a client already consumes the service, enforce the same logical ordering even if it maps to a simplified policy such as `Proxy`.
 5. Preserve nearby comments. If Loon uses numbered tags, renumber them to match physical rule order after moving entries.
-6. Re-run the full audit. Treat undefined policy targets and finance-order violations as failures.
+6. Re-run the full audit. Treat undefined targets, canonical-order violations,
+   orphan providers, domain/IP type violations, CN guard violations, and
+   finance-order violations as failures. Use `--require-generated-sync` only
+   after the Surge Split Action has completed.
 
 ## Validation
 
@@ -61,6 +71,13 @@ Ask only for decisions the repository and the canonical model cannot provide:
 - New rule providers are referenced by at least one rule.
 - Removed policy names have no stale rule references unless intentionally retained.
 - Every applicable full configuration contains the contiguous sequence `AI → PayPal → Banking → Crypto`.
+- Every full configuration follows the complete canonical order; Safe/Lite is
+  a subsequence and SafeMihomo retains its special catch-all tail.
+- Apple and regional TV blocks are contiguous and ordered; service IP remains
+  below every service/domain rule and above CN IP/ASN/GEOIP.
+- CN service subsets route to `Domestic`; `GoogleCN`/`PayPalCN` do not exist.
+- YAML providers are referenced, CustomRules IP paths use `ipcidr`, and domain
+  paths do not use `ipcidr`.
 - Loon numbered tags remain sequential after reordering.
 - Broad global, domestic, IP, and final catch-all rules remain below specific service rules.
 - Surge Split is reported as generated drift until its Action has synchronized it.
