@@ -91,6 +91,15 @@ comments, and references are stale.
 Banking uses the existing Orz-3 `exchangerate.png` URL in clients that expose a
 service icon field: Stash `icon`, Egern `icon`, and Loon Full `img-url`.
 
+## Mihomo Kernel Validation Contract
+
+After changing any Mihomo profile, validate Mobile, OpenWrt, and SafeMihomo
+with the pinned Mihomo version and archive checksum declared by CustomRules.
+Use an isolated working directory for each profile, seed `GeoSite.dat`, and run
+`mihomo -t -f`. A YAML parser only proves syntax; the kernel check additionally
+loads Mihomo fields, groups, rules, and the geosite-backed fake-IP filters. It
+does not replace rule-order, undefined-policy, provider-type, or URL audits.
+
 ## Common Policy Targets
 
 - Hard-coded: `DIRECT`, `REJECT`.

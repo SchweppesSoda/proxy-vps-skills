@@ -37,7 +37,10 @@ Do not edit Surge split files directly. Edit `Surge/AutoSurge.conf`, report loca
 & "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --require-generated-sync
 ```
 
-4. Search definitions and references across `Mihomo/`, `Stash/`, `Surge/`, `Loon/`, and `Egern/` before editing.
+4. When Mihomo files are in scope, locate the pinned Mihomo release and checksum
+   in `CustomRules/sources/toolchain.toml`. Verify the downloaded archive before
+   executing it; do not substitute an unverified binary found on `PATH`.
+5. Search definitions and references across `Mihomo/`, `Stash/`, `Surge/`, `Loon/`, and `Egern/` before editing.
 
 ## Required Decisions
 
@@ -64,6 +67,21 @@ Ask only for decisions the repository and the canonical model cannot provide:
    orphan providers, domain/IP type violations, CN guard violations, and
    finance-order violations as failures. Use `--require-generated-sync` only
    after the Surge Split Action has completed.
+7. After any Mihomo configuration edit, load all three maintained profiles with
+   the pinned kernel, not just a generic YAML parser:
+
+```powershell
+& "<python>" "<skill>/scripts/validate_mihomo_configs.py" `
+  "D:\GitRepo\ProxyConfig" `
+  --mihomo "<verified-mihomo.exe>" `
+  --geosite "<GeoSite.dat>"
+```
+
+The validator runs the equivalent of `mihomo -d <isolated-directory> -t -f
+<profile>` for Mobile, OpenWrt, and SafeMihomo. Seed `GeoSite.dat` because all
+three profiles use `geosite:` in `dns.fake-ip-filter`; a missing geodata file or
+blocked download is an environment failure, not evidence that the YAML is
+invalid. Treat any nonzero result after seeding geodata as a release blocker.
 
 ## Validation
 
@@ -81,3 +99,6 @@ Ask only for decisions the repository and the canonical model cannot provide:
 - Loon numbered tags remain sequential after reordering.
 - Broad global, domestic, IP, and final catch-all rules remain below specific service rules.
 - Surge Split is reported as generated drift until its Action has synchronized it.
+- `AutoMihomo.Mobile.yaml`, `AutoMihomo.OpenWrt.yaml`, and `SafeMihomo.yaml`
+  all pass the bundled pinned-kernel validator. This complements YAML parsing
+  and policy auditing; it does not replace either one.
