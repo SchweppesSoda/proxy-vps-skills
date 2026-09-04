@@ -1,21 +1,49 @@
 # ProxyConfig Consistency Checks
 
-## What Counts As Drift
+## What counts as drift
 
-- A provider exists in one client but is absent from another client where parity is expected.
-- An airport-like region base has some but not all of HK/TW/SG/JP/US for a client.
-- A provider was removed but remains in `Others`, `MassData`, `Speedtest`, DNS, comments, or modules.
-- A rule points to a policy group that does not exist in that client.
+- A provider/source or published artifact is missing from a client where parity
+  is expected, or a consumer points at a stale identity.
+- An airport-like region base has incomplete HK/TW/SG/JP/US coverage where the
+  client contract requires those regions.
+- A removed provider remains in a group, aggregate, rule, DNS projection,
+  comment, cache path, or generated output without an intentional-retention
+  record.
+- A rule points to a policy group that does not exist, or a provider is
+  defined but unused.
+- Airport DNS inventory is mixed with Provider Compatibility suffixes/aliases,
+  or a DNS projection is missing its intended resolver.
+- `generated-writers.json` names a missing input, workflow, validator, target,
+  duplicate marker, overlapping selector, or mismatched shared lock.
+- A generated target differs from its canonical input/expected generator, a
+  workflow diff exceeds its allowlist, or a generated result was hand-edited.
+- Surge split differs from `Surge/AutoSurge.conf` outside the workflow's normal
+  synchronization window.
+- A CustomRules consumer uses the wrong branch or artifact family, or the
+  source/build/checksum chain is incomplete.
 
-## What May Be Intentional
+## What may be intentional
 
-- A provider can be client-specific because a client lacks protocol support or uses a different Sub-Store collection.
-- Surge split files may differ transiently if GitHub Actions regenerate them.
-- Loon has a different subscription model and may not mirror Egern/Mihomo/Surge provider inventories.
-- DNS overrides can be intentionally client-specific when only one client supports a desired expression.
+- A client lacks a protocol or feature and therefore has no equivalent
+  provider, DNS projection, or service rule.
+- SafeMihomo and Loon Lite deliberately contain a reduced service set while
+  preserving the applicable order.
+- Surge split files are transiently stale while their workflow is queued or
+  running; report this as generated drift, not a manual-edit instruction.
+- Provider Compatibility and Airport DNS share Stash/Loon physical files but
+  own distinct, non-overlapping marker pairs under the same concurrency lock.
+- A provider can be client-specific because its source, collection, or
+  protocol support differs.
+- A manual/LKG entry remains outside a generated marker by explicit contract.
 
-## Suggested Follow-Up Skills
+## Evidence and follow-up
 
-- Use `proxy-groups` for provider/group fixes.
-- Use `proxy-dns-routing` for DNS and AirportServers fixes.
-- Use `proxy-rule-policy-routing` for undefined or misrouted rule targets.
+Use file/line evidence and the generated-writer index to identify the owner.
+Never paste capability-bearing values into the report; report a provider ID,
+redacted path shape, or failure class. Suggested follow-ups:
+
+- `proxy-groups` for provider identity, group membership, and source metadata;
+- `proxy-dns-routing` for DNS semantics and manual projections;
+- `proxy-rule-policy-routing` for policy targets and canonical rule order;
+- `proxy-generated-config-sync` for marker/field/whole-file writers, locks,
+  transactions, and cross-repository publication.

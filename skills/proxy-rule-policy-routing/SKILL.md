@@ -1,104 +1,112 @@
 ---
 name: proxy-rule-policy-routing
-description: Maintain rule providers, rule order, and policy routing in the user's ProxyConfig repository for Egern, Mihomo, Stash, Surge, and Loon. Use when adding, removing, reordering, or remapping service rules such as AI Suite, PayPal, Banking, Crypto, Apple Push, HTTPDNS, streaming media, Telegram, Microsoft, Apple, Google FCM, Speedtest, MyProxy, or MyDirect. Enforce cross-client precedence contracts and audit every rule target before and after editing.
+description: Maintain rule providers, rule order, and policy routing across the user's Mihomo, Surge, Stash, Loon, and Egern configurations. Use for service rules, rule-provider sources, rule ordering, and rule-to-policy mappings. Enforce the repository's precedence contracts and audit every target; hand off to proxy-generated-config-sync when a change crosses a generated writer, CustomRules publication, marker/field, or whole-file derivative.
 ---
 
 # Maintain Rule Policy Routing
 
-## Core Rule
+Treat every rule change as a cross-client policy contract. A rule target must
+resolve to an existing policy group, its provider must have the right format,
+and its position must preserve the canonical precedence. Keep this skill for
+rule semantics and order; use `$proxy-generated-config-sync` for generated
+ownership or publication.
 
-Treat every rule change as a cross-client policy contract change. A rule target must point to an existing policy group, rule ordering must preserve intended precedence, and custom rule providers must stay paired with their rule entries.
+Also load `$proxy-groups` when the rule-target change creates, deletes, or
+renames a policy group. A target-only remap to an existing group stays in this
+skill; a group-definition change is a joint operation.
 
-The finance precedence contract is fixed unless the user explicitly overrides it:
+## Canonical rule order
+
+The full configuration order in
+`references/rule-policy-model.md` is normative. Preserve, at minimum, the
+contiguous finance sequence immediately after the last AI rule:
 
 ```text
-AI rules → PayPal → Banking → Crypto → other service rules
+AI -> PayPal -> Banking -> Crypto
 ```
 
-`PayPal`, `Banking`, and `Crypto` must be active, contiguous, and in that exact order immediately after the last AI rule. Comments and blank lines may separate sections; unrelated active rules may not split the sequence.
+Apple precedes regional TV; Asian TV precedes Global TV; CN Mainland TV is the
+last media family; service IP rules follow service/domain rules and precede
+broad CN IP/ASN/GEOIP rules. Safe and Lite profiles may be deliberate
+subsequences, not accidental copies.
 
-The complete domain/media/platform/IP order is defined in
-`references/rule-policy-model.md` and is normative. In particular, the Apple
-block precedes the regional TV block; Asian TV precedes Global TV; CN Mainland
-TV is the last media block; and all service IP rules follow every domain rule
-but precede CN IP/ASN/GEOIP.
+## CustomRules publication chain
 
-Do not edit Surge split files directly. Edit `Surge/AutoSurge.conf`, report local split drift, and leave synchronization to the repository's GitHub Action.
+Custom rule sources follow this identity chain:
 
-## First Steps
+```text
+CustomRules master reviewed sources
+        -> Auto Build Rules / auto-build branch artifacts
+        -> Mihomo, Surge, Stash, Egern, and Loon consumers
+```
 
-1. Locate ProxyConfig. Prefer the current workspace when it contains `Mihomo/`, `Surge/`, and `Egern/`.
-2. Read `references/rule-policy-model.md` before changing rule order or adding a service.
-3. Run the full rule audit before edits. Run a filtered audit only as an additional focused view:
+`master` owns reviewed `sources/`, catalogs, toolchain, tests, workflows, and
+non-rule resources. `auto-build` owns generated YAML/MRS/LIST artifacts and
+their manifest/checksum metadata. Do not edit generated artifacts or switch a
+consumer's branch merely to make URLs look consistent. If a task changes a
+source file, builder, generated artifact, checksum, or publication workflow,
+load `$proxy-generated-config-sync` and wait for the appropriate build/check
+before treating the consumer as updated.
+
+## First steps
+
+1. Resolve `<proxyconfig-root>` and `<proxy-vps-skills-root>` from the active
+   checkouts; never assume a hard-coded drive path.
+2. Read `references/rule-policy-model.md`, then search definitions and
+   consumers with `rg` across Mihomo, Stash, Surge, Loon, and Egern.
+3. Run the full rule audit before edits:
 
 ```powershell
-& "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig"
-& "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --policy PayPal --policy Banking --policy Crypto
-& "<python>" "<skill>/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig" --require-generated-sync
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-rule-policy-routing/scripts/audit_rule_policy_refs.py" "<proxyconfig-root>"
 ```
 
-4. When Mihomo files are in scope, locate the pinned Mihomo release and checksum
-   in `CustomRules/sources/toolchain.toml`. Verify the downloaded archive before
-   executing it; do not substitute an unverified binary found on `PATH`.
-5. Search definitions and references across `Mihomo/`, `Stash/`, `Surge/`, `Loon/`, and `Egern/` before editing.
+Use `--policy` filters only as an additional focused view. Use
+`--require-generated-sync` after the repository's Surge Split workflow has
+completed, not as a substitute for that workflow.
+4. When Mihomo files are in scope, use the pinned toolchain declared by
+   CustomRules and the bundled kernel validator; do not substitute an
+   unverified executable from `PATH`.
 
-## Required Decisions
+## Edit workflow
 
-Ask only for decisions the repository and the canonical model cannot provide:
+1. Classify the operation: add/remove provider, add/remap rule, reorder a
+   service block, change a policy target, or change a CustomRules source.
+2. Audit old/new policy names, provider paths, client-specific rule shapes,
+   and all consumers before editing.
+3. Update service policy groups before adding a rule that targets them. Keep
+   each full profile's canonical order and preserve intentionally minimal
+   Safe/Lite clients.
+4. For a CustomRules source change, modify the reviewed `master` source and
+   invoke the repository builder/tests; do not hand-edit the `auto-build`
+   result. For a Surge rule change, edit `Surge/AutoSurge.conf`; split files
+   are generated outputs.
+5. If the edit touches a generated writer input, marker/field, whole-file
+   derivative, diff allowlist, or cross-repository publication, keep the
+   generated-writer skill loaded and follow its transaction/lock checks.
+6. Re-run the full rule audit, targeted reference searches, and applicable
+   client/kernel validators. Report any consumer waiting for a downstream
+   build or split synchronization.
 
-- Which policy should receive the rule hit if multiple existing groups are plausible.
-- Whether a genuinely new rule family belongs before or after an existing canonical section.
-- Whether to add a new service group or reuse an existing policy.
-- Whether a rule-provider URL should be a local/custom provider, MetaCubeX MRS provider, blackmatrix7 list, dler list, or another source.
+## Decisions that may require the user
 
-## Edit Workflow
+Ask only when the repository and canonical model cannot decide:
 
-1. Audit the target policy name and likely aliases.
-2. Classify the operation: add rule, remove rule, remap rule to policy, reorder section, or add service policy group plus rule.
-3. Compare every active client surface before choosing the edit set:
-   - Mihomo: Mobile, OpenWrt, and Safe profiles; update `rules`, `rule-providers`, and service groups when applicable.
-   - Stash: `rules`, `rule-providers`, and service groups.
-   - Egern: `rules` and any service `policy_groups` required by the rule target.
-   - Surge: canonical `[Rule]` lines in `AutoSurge.conf` and service groups if needed; do not hand-edit generated split files.
-   - Loon: Full and Lite remote rules plus service groups when applicable.
-4. Preserve intentionally minimal clients. Do not add a missing service to Safe or Lite solely for symmetry; when a client already consumes the service, enforce the same logical ordering even if it maps to a simplified policy such as `Proxy`.
-5. Preserve nearby comments. If Loon uses numbered tags, renumber them to match physical rule order after moving entries.
-6. Re-run the full audit. Treat undefined targets, canonical-order violations,
-   orphan providers, domain/IP type violations, CN guard violations, and
-   finance-order violations as failures. Use `--require-generated-sync` only
-   after the Surge Split Action has completed.
-7. After any Mihomo configuration edit, load all three maintained profiles with
-   the pinned kernel, not just a generic YAML parser:
-
-```powershell
-& "<python>" "<skill>/scripts/validate_mihomo_configs.py" `
-  "D:\GitRepo\ProxyConfig" `
-  --mihomo "<verified-mihomo.exe>" `
-  --geosite "<GeoSite.dat>"
-```
-
-The validator runs the equivalent of `mihomo -d <isolated-directory> -t -f
-<profile>` for Mobile, OpenWrt, and SafeMihomo. Seed `GeoSite.dat` because all
-three profiles use `geosite:` in `dns.fake-ip-filter`; a missing geodata file or
-blocked download is an environment failure, not evidence that the YAML is
-invalid. Treat any nonzero result after seeding geodata as a release blocker.
+- which existing policy should receive a rule hit;
+- whether a new service belongs before or after an existing block;
+- whether to create a service policy group or reuse one;
+- which remote/custom provider is approved for a new rule source;
+- whether a missing client projection is intentional.
 
 ## Validation
 
-- All rule targets are defined policy groups or known built-ins.
-- New rule providers are referenced by at least one rule.
-- Removed policy names have no stale rule references unless intentionally retained.
-- Every applicable full configuration contains the contiguous sequence `AI → PayPal → Banking → Crypto`.
-- Every full configuration follows the complete canonical order; Safe/Lite is
-  a subsequence and SafeMihomo retains its special catch-all tail.
-- Apple and regional TV blocks are contiguous and ordered; service IP remains
-  below every service/domain rule and above CN IP/ASN/GEOIP.
-- CN service subsets route to `Domestic`; `GoogleCN`/`PayPalCN` do not exist.
-- YAML providers are referenced, CustomRules IP paths use `ipcidr`, and domain
-  paths do not use `ipcidr`.
-- Loon numbered tags remain sequential after reordering.
-- Broad global, domestic, IP, and final catch-all rules remain below specific service rules.
-- Surge Split is reported as generated drift until its Action has synchronized it.
-- `AutoMihomo.Mobile.yaml`, `AutoMihomo.OpenWrt.yaml`, and `SafeMihomo.yaml`
-  all pass the bundled pinned-kernel validator. This complements YAML parsing
-  and policy auditing; it does not replace either one.
+- Every active rule target resolves to a defined group or built-in.
+- Providers are referenced by rules when required and use the correct domain or
+  IP behavior; unused providers are errors.
+- Full profiles preserve the complete canonical order and the finance
+  sequence; Safe/Lite remain valid subsequences with their documented tail.
+- Loon tags remain sequential after reordering.
+- CustomRules source, `auto-build` artifacts, branch/path, manifest, and
+  checksums agree; consumers are not claimed current before the build passes.
+- Surge split drift is reported until the workflow synchronizes it.
+- Generated ownership and cross-repository publication are validated by
+  `$proxy-generated-config-sync`, not by hand-edited output.

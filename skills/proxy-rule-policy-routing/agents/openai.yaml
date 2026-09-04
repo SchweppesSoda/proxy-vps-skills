@@ -1,7 +1,7 @@
 interface:
   display_name: "Proxy Rule Policy Routing"
-  short_description: "Maintain cross-client rule order and policy routing safely."
-  default_prompt: "Use $proxy-rule-policy-routing to add, remove, or remap service rules with a policy audit first."
+  short_description: "Maintain rule order, providers, and policy targets safely."
+  default_prompt: "Use $proxy-rule-policy-routing to update rule policy routing or CustomRules consumers while preserving canonical order."
 
 policy:
   allow_implicit_invocation: true

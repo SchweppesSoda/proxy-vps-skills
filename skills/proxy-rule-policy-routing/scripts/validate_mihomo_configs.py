@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -15,6 +17,29 @@ DEFAULT_CONFIGS = (
     Path("Mihomo/AutoMihomo.OpenWrt.yaml"),
     Path("Mihomo/SafeMihomo.yaml"),
 )
+
+URL_RE = re.compile(
+    r"(?i)\b(?:https?|ftp|socks5?|ssr?|vmess|vless|trojan|hysteria2?|tuic|wireguard)://[^\s'\"<>]+"
+)
+UUID_RE = re.compile(r"(?i)\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b")
+SECRET_RE = re.compile(
+    r"""(?ix)
+    (["']?\b(?:authorization|proxy[-_ ]?authorization|password|passwd|
+    passphrase|client[-_ ]?(?:secret|password)|secret|credential|
+    private[-_ ]?key|x[-_ ]?api[-_ ]?key|api[-_ ]?(?:key|secret|token)|
+    access[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|auth[-_ ]?token|
+    capability[-_ ]?token|bearer|token)\b["']?\s*[:=]\s*)
+    (?:"[^"]*"|'[^']*'|[^\s,;}\]]+)
+    """
+)
+BLOB_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{48,}(?![A-Za-z0-9])")
+
+
+def redact_text(value: str) -> str:
+    value = URL_RE.sub("<redacted-url>", value)
+    value = SECRET_RE.sub(r"\1<redacted>", value)
+    value = UUID_RE.sub("<redacted-uuid>", value)
+    return BLOB_RE.sub("<redacted>", value)
 
 
 def run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
@@ -45,8 +70,10 @@ def validate_configs(
 
     version = run_command([str(mihomo), "-v"])
     if version.returncode != 0:
-        raise RuntimeError(f"Mihomo version check failed:\n{version.stdout}{version.stderr}")
-    print((version.stdout or version.stderr).strip())
+        raise RuntimeError(
+            f"Mihomo version check failed:\n{redact_text(version.stdout + version.stderr)}"
+        )
+    print(redact_text((version.stdout or version.stderr).strip()))
 
     failures = 0
     for relative in configs:
@@ -69,7 +96,7 @@ def validate_configs(
             failures += 1
             print(f"[FAIL] {config.relative_to(repo).as_posix()} (exit {result.returncode})")
             if output:
-                print(output)
+                print(redact_text(output))
 
     print(f"Mihomo config validation: {len(configs) - failures} passed, {failures} failed")
     return 1 if failures else 0
@@ -90,12 +117,16 @@ def main() -> int:
         help="Profile relative to the repository; repeat to override the defaults",
     )
     args = parser.parse_args()
-    return validate_configs(
-        args.repo,
-        args.mihomo,
-        args.geosite,
-        args.configs or list(DEFAULT_CONFIGS),
-    )
+    try:
+        return validate_configs(
+            args.repo,
+            args.mihomo,
+            args.geosite,
+            args.configs or list(DEFAULT_CONFIGS),
+        )
+    except (OSError, RuntimeError) as exc:
+        print(f"error: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

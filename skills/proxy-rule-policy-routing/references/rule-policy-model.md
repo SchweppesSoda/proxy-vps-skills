@@ -1,5 +1,27 @@
 # ProxyConfig Rule Policy Model
 
+## CustomRules source, artifact, and consumer chain
+
+CustomRules has two deliberate branches with different ownership:
+
+```text
+master reviewed sources/catalogs/toolchain
+        → Auto Build Rules
+auto-build generated YAML/MRS/LIST + manifest/checksums
+        → client rule-provider consumers
+```
+
+Edit reviewed sources on `master`; never hand-edit files on `auto-build`.
+After a source or builder change, run the CustomRules tests and deterministic
+builder/verification workflow before updating or declaring client consumers
+current. The branch and artifact path in each canonical client configuration
+are part of the contract.
+
+If a source change also touches a generated marker, selected field, whole-file
+derivative, diff allowlist, lock, or cross-repository publication, load
+`proxy-generated-config-sync`. That skill owns writer scope and publication
+hygiene; this reference remains authoritative for rule semantics and order.
+
 ## Main Surfaces
 
 - Mihomo Mobile/OpenWrt/Safe: `rules` consume names from `rule-providers`; service groups live under `proxy-groups`.

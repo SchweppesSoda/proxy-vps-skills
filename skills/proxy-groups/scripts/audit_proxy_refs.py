@@ -3,7 +3,7 @@
 
 The script is intentionally dependency-free. It does not validate full YAML or
 Surge syntax; it finds definitions and occurrences so an agent can reason about
-the edit surface before touching MIHOMO, Surge, or Egern config files.
+the edit surface before touching Mihomo, Surge, Egern, Stash, or Loon files.
 """
 
 from __future__ import annotations
@@ -12,14 +12,132 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import asdict, dataclass
+import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import urlsplit
 
 
-CONFIG_SUFFIXES = {".yaml", ".yml", ".conf", ".dconf"}
-DEFAULT_DIRS = ("Mihomo", "Surge", "Egern")
+CONFIG_SUFFIXES = {".yaml", ".yml", ".conf", ".dconf", ".json"}
+DEFAULT_DIRS = ("Mihomo", "Surge", "Egern", "Stash", "Loon")
 DEFINITION_WINDOW = 12
+
+# Audit reports are frequently copied into issue trackers and agent logs.
+# Strip credentials and provider capability material before anything reaches
+# either the text or JSON renderer.
+_URL_RE = re.compile(
+    r"(?<![A-Za-z0-9+.-])"
+    r"[A-Za-z][A-Za-z0-9+.-]*:"
+    r"(?://|(?:\\?/){2})[^\s<>{}\[\]()\\\"'`,;]+",
+    re.IGNORECASE,
+)
+_HEX_CAPABILITY_RE = re.compile(r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{64}(?![A-Fa-f0-9])")
+_UUID_RE = re.compile(r"(?i)\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b")
+_SENSITIVE_KEY_RE = re.compile(
+    r"(?<![\w-])['\"]?(?:"
+    r"authorization|proxy[-_ ]?authorization|password|passwd|passphrase|"
+    r"client[-_ ]?secret|client[-_ ]?password|secret|credential|"
+    r"private[-_ ]?key|x[-_ ]?api[-_ ]?key|api[-_ ]?(?:key|secret|token)|"
+    r"access[-_ ]?key|"
+    r"access[-_ ]?token|"
+    r"refresh[-_ ]?token|auth[-_ ]?token|capability[-_ ]?token|token"
+    r")[ '\"]*\s*[:=：＝]\s*",
+    re.IGNORECASE,
+)
+
+
+def _redact_urls(value: str) -> str:
+    """Replace complete scheme-based URIs with a safe scheme/host summary."""
+
+    def replace(match: re.Match[str]) -> str:
+        raw = match.group(0)
+        trailing = ""
+        while raw and raw[-1] in ".;:!?)]}":
+            trailing = raw[-1] + trailing
+            raw = raw[:-1]
+
+        try:
+            parsed = urlsplit(raw.replace("\\/", "/"))
+            scheme = parsed.scheme.casefold()
+            hostname = parsed.hostname
+        except ValueError:
+            scheme = ""
+            hostname = None
+
+        if hostname and scheme in {"http", "https", "ftp"}:
+            safe_host = _HEX_CAPABILITY_RE.sub("[REDACTED_TOKEN]", hostname)
+            return f"[REDACTED_URL scheme={scheme} host={safe_host}]{trailing}"
+        if scheme:
+            return f"[REDACTED_URL scheme={scheme}]{trailing}"
+        return f"[REDACTED_URL]{trailing}"
+
+    return _URL_RE.sub(replace, value)
+
+
+def _redact_sensitive_assignments(value: str) -> str:
+    """Redact values assigned to secret-like keys in YAML/JSON/INI text.
+
+    This is deliberately line-oriented: the script is an inventory scanner,
+    not a YAML parser.  Delimiters and comments are preserved while an
+    unquoted scalar consumes the whole value, including ``Bearer`` headers.
+    """
+
+    result: list[str] = []
+    cursor = 0
+    for match in _SENSITIVE_KEY_RE.finditer(value):
+        if match.start() < cursor:
+            continue
+
+        result.append(value[cursor : match.end()])
+        start = match.end()
+        while start < len(value) and value[start].isspace() and value[start] not in "\r\n":
+            result.append(value[start])
+            start += 1
+
+        if start >= len(value) or value[start] in "\r\n":
+            cursor = start
+            continue
+
+        quote = value[start] if value[start] in {"'", '"'} else None
+        if quote:
+            end = start + 1
+            escaped = False
+            while end < len(value):
+                char = value[end]
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    end += 1
+                    break
+                end += 1
+            result.append(f"{quote}[REDACTED]{quote}")
+            cursor = end
+            continue
+
+        end = start
+        while end < len(value) and value[end] not in ",}]\r\n#":
+            end += 1
+        scalar = value[start:end]
+        if scalar.strip():
+            result.append(scalar[: len(scalar) - len(scalar.lstrip())])
+            result.append("[REDACTED]")
+            result.append(scalar[len(scalar.rstrip()) :])
+        cursor = end
+
+    result.append(value[cursor:])
+    return "".join(result)
+
+
+def redact_text(value: str) -> str:
+    """Return an audit-safe representation of arbitrary config text."""
+
+    redacted = _redact_urls(value)
+    redacted = _redact_sensitive_assignments(redacted)
+    redacted = _UUID_RE.sub("[REDACTED_UUID]", redacted)
+    return _HEX_CAPABILITY_RE.sub("[REDACTED_TOKEN]", redacted)
 
 
 def configure_output() -> None:
@@ -50,7 +168,10 @@ def read_text(path: Path) -> str:
 
 
 def normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", value.casefold())
+    """Normalize names without discarding non-ASCII letters or digits."""
+
+    value = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(char for char in value if char.isalnum())
 
 
 def strip_quotes(value: str) -> str:
@@ -61,7 +182,9 @@ def strip_quotes(value: str) -> str:
 
 
 def parse_name_from_yaml(line: str) -> str | None:
-    flow = re.search(r"\bname\s*:\s*([^,}#]+)", line)
+    # The optional quotes also cover JSON objects encountered under a client
+    # directory; a full JSON parser is unnecessary for line-level inventory.
+    flow = re.search(r"['\"]?name['\"]?\s*:\s*([^,}\]#]+)", line)
     if flow:
         return strip_quotes(flow.group(1))
 
@@ -89,17 +212,13 @@ def infer_yaml_kind(lines: list[str], index: int) -> str:
 
 
 def is_mihomo_provider_key(lines: list[str], index: int) -> bool:
-    seen_proxy_providers = False
     for back in range(index, -1, -1):
         line = lines[back]
-        if re.match(r"^[A-Za-z0-9_-]+:\s*$", line):
-            if line.startswith("proxy-providers:"):
-                seen_proxy_providers = True
-            elif seen_proxy_providers:
-                return False
-        if line.startswith("proxy-providers:"):
+        if re.match(r"^proxy-providers\s*:\s*$", line):
             return True
-        if line.startswith("proxy-groups:"):
+        if re.match(r"^(?:proxy-groups|policy_groups|policy-groups)\s*:\s*$", line):
+            return False
+        if back != index and re.match(r"^[A-Za-z0-9_-]+:\s*$", line):
             return False
     return False
 
@@ -122,7 +241,7 @@ def extract_definitions(path: Path, repo: Path) -> list[Definition]:
             continue
 
         provider_key = re.match(r"^\s{2}([A-Za-z][\w-]*)\s*:\s*$", line)
-        if provider_key and "Mihomo" in path.parts and is_mihomo_provider_key(lines, idx):
+        if provider_key and is_mihomo_provider_key(lines, idx):
             name = provider_key.group(1)
             defs.append(Definition(name=name, file=rel, line=idx + 1, kind="mihomo-provider", text=stripped))
             continue
@@ -182,24 +301,31 @@ def find_hits(repo: Path, files: Iterable[Path], targets: list[str], definitions
 
 
 def print_text_report(repo: Path, files: list[Path], results: dict[str, dict[str, list]]) -> None:
-    print(f"Repo: {repo}")
+    print(f"Repo: {redact_text(str(repo))}")
     print("Scanned files:")
     for path in files:
-        print(f"  - {path.relative_to(repo)}")
+        print(f"  - {redact_text(str(path.relative_to(repo)))}")
 
     for target, data in results.items():
         print()
-        print(f"=== Target: {target} ===")
+        print(f"=== Target: {redact_text(target)} ===")
         definitions: list[Definition] = data["definitions"]
         hits: list[Hit] = data["hits"]
 
         print(f"Definitions: {len(definitions)}")
         for item in definitions:
-            print(f"  {item.file}:{item.line} [{item.kind}] {item.name} :: {item.text}")
+            print(
+                f"  {redact_text(item.file)}:{item.line} "
+                f"[{redact_text(item.kind)}] {redact_text(item.name)} :: "
+                f"{redact_text(item.text)}"
+            )
 
         print(f"Occurrences: {len(hits)}")
         for item in hits:
-            print(f"  {item.file}:{item.line} [{item.kind}] {item.text}")
+            print(
+                f"  {redact_text(item.file)}:{item.line} "
+                f"[{redact_text(item.kind)}] {redact_text(item.text)}"
+            )
 
         if not hits:
             print("  (none)")
@@ -213,34 +339,74 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def safe_definition(item: Definition) -> dict[str, str | int]:
+    return {
+        "name": redact_text(item.name),
+        "file": redact_text(item.file),
+        "line": item.line,
+        "kind": redact_text(item.kind),
+        "text": redact_text(item.text),
+    }
+
+
+def safe_hit(item: Hit) -> dict[str, str | int]:
+    return {
+        "file": redact_text(item.file),
+        "line": item.line,
+        "kind": redact_text(item.kind),
+        "text": redact_text(item.text),
+    }
+
+
 def main(argv: list[str]) -> int:
     configure_output()
     args = parse_args(argv)
-    repo = args.repo.resolve()
-    if not repo.exists():
-        print(f"error: repo does not exist: {repo}", file=sys.stderr)
+    try:
+        repo = args.repo.resolve()
+    except OSError as exc:
+        print(f"error: unable to resolve repo: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
+    if not repo.exists() or not repo.is_dir():
+        print(f"error: repo directory does not exist: {redact_text(str(repo))}", file=sys.stderr)
         return 2
     if not args.target:
         print("error: provide at least one --target", file=sys.stderr)
         return 2
+    if any(not target.strip() or not normalize(target) for target in args.target):
+        print("error: each --target must contain a letter or digit", file=sys.stderr)
+        return 2
 
-    files = find_config_files(repo)
-    definitions: list[Definition] = []
-    for path in files:
-        definitions.extend(extract_definitions(path, repo))
+    try:
+        files = find_config_files(repo)
+        definitions: list[Definition] = []
+        for path in files:
+            definitions.extend(extract_definitions(path, repo))
+    except OSError as exc:
+        print(f"error: unable to read repo: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
 
-    results = find_hits(repo, files, args.target, definitions)
+    try:
+        results = find_hits(repo, files, args.target, definitions)
+    except OSError as exc:
+        print(f"error: unable to read repo: {redact_text(str(exc))}", file=sys.stderr)
+        return 2
     if args.json:
         payload = {
-            "repo": str(repo),
-            "files": [str(path.relative_to(repo)) for path in files],
+            "repo": redact_text(str(repo)),
+            # Keep the historical ``files`` key and expose an explicit name
+            # for consumers that want to assert exactly what was scanned.
+            "files": [redact_text(str(path.relative_to(repo))) for path in files],
+            "scanned_files": [redact_text(str(path.relative_to(repo))) for path in files],
             "targets": {
                 key: {
-                    "definitions": [asdict(item) for item in value["definitions"]],
-                    "hits": [asdict(item) for item in value["hits"]],
+                    "definitions": [safe_definition(item) for item in value["definitions"]],
+                    "hits": [safe_hit(item) for item in value["hits"]],
                 }
                 for key, value in results.items()
             },
+        }
+        payload["targets"] = {
+            redact_text(key): value for key, value in payload["targets"].items()
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:

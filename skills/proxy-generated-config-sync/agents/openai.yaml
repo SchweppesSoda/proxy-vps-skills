@@ -1,0 +1,7 @@
+interface:
+  display_name: "Generated Config Sync"
+  short_description: "Coordinate generated writers, scopes, locks, and publication."
+  default_prompt: "Use $proxy-generated-config-sync to review a generated writer, marker scope, or cross-repository publication safely."
+
+policy:
+  allow_implicit_invocation: true

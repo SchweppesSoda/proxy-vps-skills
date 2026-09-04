@@ -1,0 +1,138 @@
+# Generated Writer Contract
+
+`Sub-Store/config/generated-writers.json` is a deliberately thin index. It
+records stable ownership and routing only; it is not a provider manifest and
+must not become a second source of DNS, compatibility, or rule data.
+
+## Index shape
+
+The current schema is `1`:
+
+```json
+{
+  "schema": 1,
+  "writers": [
+    {
+      "id": "stable-writer-id",
+      "inputs": [
+        {"repository": "ProxyConfig", "branch": "optional", "path": "relative/input"}
+      ],
+      "entrypoint": "relative/cli-or-generator",
+      "workflow": ".github/workflows/workflow.yml",
+      "concurrency_group": "lock-name",
+      "targets": [
+        {
+          "repository": "ProxyConfig",
+          "branch": "optional",
+          "path": "relative/output",
+          "scope": "whole-file",
+          "selector": "optional marker or field identity"
+        }
+      ],
+      "delegates_to": ["another-writer-id"],
+      "validators": ["non-executable test/check locator"],
+      "intentional_exclusions": ["documented non-target"]
+    }
+  ]
+}
+```
+
+`branch` is optional for the current repository's default branch and should be
+included when an external repository has more than one relevant branch. In
+CustomRules, reviewed inputs are on `master`, while generated artifacts are on
+the `auto-build` branch; `auto-build` is not a directory under `master`.
+
+`targets[].scope` is exactly one of `whole-file`, `marker-pair`, or
+`field-selector`. `selector` is required when a path has more than one owned
+marker or field; it names the stable marker/field identity without carrying
+provider data. A glob path is allowed only when the writer owns a generated
+artifact set, such as the CustomRules `auto-build` branch outputs.
+
+The index may name repository IDs and relative paths, entrypoints, workflows,
+locks, validators, and intentional exclusions. It must never contain a
+capability URL, token, bearer credential, provider response, or other secret.
+Provider names and mutable policy belong in the existing airport manifest,
+Provider Compatibility registry/provider JSON, CustomRules sources, or the
+repository tests that already own them.
+
+`validators` is a routing list, not an executable command list. Never pass an
+entry to a shell, `eval`, or a subprocess verbatim. Resolve the locator against
+the named repository, workflow, and automation reference, then run only the
+documented test or check mode. A string containing arguments records the
+intended check shape; it does not grant authority to run a generator,
+publisher, network fetch, or write-capable command. A read-only audit reports
+an unclear or write-capable validator as skipped.
+
+## Scope rules
+
+- `whole-file`: the target is a derivative. Do not hand-edit it; regenerate
+  it from its canonical input and verify the complete output.
+- `marker-pair`: replace only the bytes between the exact begin/end marker
+  pair. Missing, duplicate, reordered, or differently indented markers fail
+  closed. Manual text outside the pair is preserved.
+- `field-selector`: replace only the named field range. The Loon real-IP
+  block is a field-scoped marker with an ownership ledger; unlabelled manual
+  tokens must survive a shrink.
+
+The owner of a marker or field is not the owner of the surrounding file. Two
+writers may therefore share `Stash/AutoStash.yaml` or `Loon/AutoLoon.conf`,
+but their marker selectors must be non-overlapping and their
+`concurrency_group` values must be identical. The current pairs are:
+
+```text
+Airport DNS:
+  AUTO-GENERATED AIRPORT DNS
+Provider Compatibility:
+  AUTO-GENERATED PROVIDER-COMPAT REAL-IP
+  AUTO-GENERATED PROVIDER-COMPAT HOSTS
+```
+
+The same separation applies to the two marked AirportServers sources in the
+external CustomRules repository. CTC pinned entries are manual and remain
+outside the dynamic marker.
+
+## Canonical versus generated
+
+The current canonical/generated boundaries are:
+
+```text
+Mihomo/AutoMihomo.Mobile.yaml          canonical input for source discovery
+Mihomo/AutoMihomo.OpenWrt.yaml         canonical OpenWrt baseline
+Mihomo/AutoMihomo.OpenWrt-WAN2.yaml    generated whole-file derivative
+SafeMihomo.yaml (when present)         maintained, intentionally minimal profile
+Surge/AutoSurge.conf                   canonical full Surge profile
+Surge/Split Conf/AutoSurge/*           generated split outputs
+CustomRules master sources             reviewed canonical rule inputs
+CustomRules branch `auto-build`       generated public rule artifacts
+```
+
+Do not revive a generic legacy profile path as a universal source. Discover the
+maintained profiles present in the repository and use the specific path named
+by the active manifest or registry. A canonical profile can be an input to a
+generator without itself being generated.
+
+Provider Compatibility may render the provider-compat markers in the OpenWrt
+baseline and invoke `generate_openwrt_wan2_profile.py` for the WAN2 payload.
+The `openwrt-wan2` writer remains the whole-file owner; this relationship is
+represented by `delegates_to`, not by a second overlapping owner.
+
+## Validation contract
+
+Use the commands already declared by the selected workflow and automation
+reference. Typical checks include:
+
+- Airport DNS: its focused unit test, Stash/Loon config audits, and
+  CustomRules tests/diff allowlist.
+- Provider Compatibility: provider-compat tests, its diff-ownership check,
+  the WAN2 `--check`, Stash/Loon audits, and generated-config tests.
+- OpenWrt WAN2: the generator test and `generate_openwrt_wan2_profile.py
+  --check`.
+- Surge split: the workflow's full-to-split regeneration and `git diff
+  --check`; inspect full/split drift rather than hand-editing split output.
+- CustomRules: builder tests, pinned compiler verification, deterministic
+  double-build comparison, artifact verification, and the `auto-build` branch
+  publication guard.
+
+The domain-specific audit skills remain required for semantic checks. A
+writer check proves ownership and generation hygiene; it does not prove that
+all policy groups, DNS semantics, or rule order are correct.

@@ -1,65 +1,111 @@
 # proxy-vps-skills
 
-这是给 `ProxyConfig` 仓库使用的 Codex skills 集合，目标是把代理配置维护中容易漏改、容易跨客户端不一致的操作沉淀成可复用工作流。
-
-当前重点覆盖 Egern、Mihomo、Stash、Surge、Loon 的代理组、DNS 路由、规则策略和一致性审计。Surge split config 同步不在本仓库实现，因为已经由专门的 GitHub Action 处理。
-
-## 命名约定
-
-本仓库里的所有 skill 都要使用明确的域名前缀，方便在 Codex 中搜索和调用。目录名和 `SKILL.md` frontmatter 的 `name` 必须一致，并优先使用 `proxy-`、`vps-` 这类前缀；`agents/openai.yaml` 里的 default prompt 也要使用相同的 `$skill-name`。
+这是给 `ProxyConfig` 使用的 Codex skills 集合，把跨客户端代理配置维护中
+容易漏改、容易漂移、容易误写 generated 文件的操作沉淀成可复用工作流。
+当前覆盖 Mihomo、Surge、Stash、Loon、Egern，以及与 CustomRules 的公开规则
+产物关系。
 
 ## Skills
 
-| Skill | 用途 | 典型场景 |
+| Skill | 用途 | 触发边界 |
 | --- | --- | --- |
-| `proxy-groups` | 维护代理组、机场 provider、自建 VPS 组、地区组、Relay/Dialer、`MassData`、`Others`，并维护 provider source 元数据。 | 新增/删除/重命名机场；新增 `PO0 SG`；拆分 `Core JP`/`Edge JP`；修改 provider URL、Sub-Store 名称、cache path、节点 prefix。 |
-| `proxy-dns-routing` | 维护 DNS 解析路径，重点关注 AirportServers、机场节点域名、provider 专用 DoH、Egern `dns.forward`、Mihomo `proxy-server-nameserver-policy`、Surge Host 映射。 | 更新 AirportServers 引用；给机场节点域名指定 DoH；排查节点域名解析路径；避免代理启动前 DNS 依赖错误。 |
-| `proxy-rule-policy-routing` | 维护 rule-provider 到 policy group 的路由关系和跨客户端规则顺序。 | 新增/调整 `AI Suite`、`PayPal`、`Banking`、`Crypto`、`Apple Push`、`HTTPDNS`、流媒体、`Speedtest`、`MyProxy`/`MyDirect` 等规则；检查规则目标与优先级契约。 |
-| `proxy-config-consistency-audit` | 只读一致性审计，不直接修改配置。 | 检查 Egern/Mihomo/Surge provider 是否不一致；地区组是否缺 HK/TW/SG/JP/US；删除机场后是否还有残留引用；规则是否指向不存在的策略组。 |
+| `proxy-groups` | 维护代理组、provider source、Sub-Store collection、节点前缀和消费者引用。 | 普通 provider/group 身份、成员和 source 变更；跨 generated writer 时联合 `proxy-generated-config-sync`。 |
+| `proxy-dns-routing` | 维护 AirportServers、机场节点域名、DoH、DNS upstream、Host 映射和 HTTPDNS 路由。 | 普通 DNS 语义和人工投影；涉及 Airport DNS/Provider Compatibility writer 时联合 generated skill。 |
+| `proxy-rule-policy-routing` | 维护 rule-provider、规则顺序和 rule-to-policy 映射。 | 普通规则与策略语义；涉及 CustomRules build、marker 或派生文件时联合 generated skill。 |
+| `proxy-config-consistency-audit` | 只读编排五客户端、规则、DNS、provider 和 generated writer 一致性。 | 变更前后审计、漂移定位和验收，不直接修改配置。 |
+| `proxy-generated-config-sync` | 维护 generated writer ownership、marker/field/whole-file scope、锁、事务和跨仓发布边界。 | 仅用于 Airport DNS、Provider Compatibility、OpenWrt→WAN2、Surge full→split、CustomRules 发布及 writer 合同。 |
+
+## 安装
+
+发布到远程仓库后，分别安装需要的 skill：
+
+```powershell
+npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-groups
+npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-dns-routing
+npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-rule-policy-routing
+npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-config-consistency-audit
+npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-generated-config-sync
+```
+
+开发中的未提交版本不会被 `npx` 从远程仓库拉取；应先同步本机源码与 skill
+安装目录，发布并推送后再使用上述命令安装或更新。
+
+常见联合路由：
+
+| 变更 | 必选 skill | 条件性联动 |
+| --- | --- | --- |
+| provider URL/path/collection | `proxy-groups` | URL host 同时是节点解析对象时加 `proxy-dns-routing`；跨 generated scope 时再加 generated skill。 |
+| 可见 group/policy rename | `proxy-groups` | 存在 rule consumer 时加 `proxy-rule-policy-routing`。 |
+| rule target add/remap/delete | `proxy-rule-policy-routing` | 同时新增、删除或重命名 group 时加 `proxy-groups`。 |
+| Airport DNS / Provider Compatibility / derivative / publication | 对应 domain skill | 必须同时使用 `proxy-generated-config-sync`。 |
+
+## Source of truth
+
+```text
+Surge/AutoSurge.conf                    canonical full profile
+    └─ Surge/Split Conf/AutoSurge/       generated split output
+
+Mihomo/AutoMihomo.OpenWrt.yaml           canonical OpenWrt baseline
+    └─ Mihomo/AutoMihomo.OpenWrt-WAN2.yaml generated whole-file derivative
+
+CustomRules master sources               reviewed rule inputs
+    └─ CustomRules auto-build branch     generated YAML/MRS/LIST artifacts
+```
+
+`Sub-Store/config/generated-writers.json` 是 schema 1 的薄 ownership 索引；
+它只记录 writer、输入、目标 scope、workflow、锁、validator 和有意排除项，
+不记录 provider 数据、完整 capability URL、token 或 credential。具体算法和
+易变数据仍由仓库脚本、manifest、registry、workflow 与测试负责。
 
 ## 推荐用法
 
-在 Codex 中直接点名 skill，例如：
+在 Codex 中点名 skill，例如：
 
 ```text
-用 $proxy-groups 给 Egern 和 Mihomo 增加 LiangXin 机场，各地区组用 select。
+用 $proxy-groups 检查一个 provider rename 的 source → collection → artifact → consumer 链。
 ```
 
 ```text
-用 $proxy-dns-routing 检查 AirportServers 和 CTC 节点域名的 DNS 路由。
+用 $proxy-dns-routing 审计 AirportServers 和某个节点域名的 DNS 路径。
 ```
 
 ```text
-用 $proxy-rule-policy-routing 把 PayPal、Banking、Crypto 连续放到 AI 后面，并检查所有客户端顺序。
+用 $proxy-rule-policy-routing 调整规则并保持 AI → PayPal → Banking → Crypto 顺序。
 ```
 
 ```text
-用 $proxy-config-consistency-audit 审计当前 ProxyConfig 有没有漏引用。
+用 $proxy-generated-config-sync review Provider Compatibility writer 的 marker 和锁。
+```
+
+```text
+用 $proxy-config-consistency-audit 审计当前 ProxyConfig 的跨客户端和 generated 漂移。
 ```
 
 ## 审计脚本
 
-每个维护型 skill 都带一个只读审计脚本，脚本均不依赖第三方库：
+命令中的 `<proxyconfig-root>` 是包含 `Mihomo/`、`Surge/`、`Stash/`、`Loon/`、
+`Egern/` 的 checkout；`<proxy-vps-skills-root>` 是包含 `skills/` 的 checkout。
+不要把本机盘符或个人安装路径写进 skill、日志或提交：
 
 ```powershell
-& "<python>" "skills/proxy-groups/scripts/audit_proxy_refs.py" "D:\GitRepo\ProxyConfig" --target LiangXin
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-groups/scripts/audit_proxy_refs.py" "<proxyconfig-root>" --target "<name>"
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-dns-routing/scripts/audit_dns_routing.py" "<proxyconfig-root>" --airportservers
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-rule-policy-routing/scripts/audit_rule_policy_refs.py" "<proxyconfig-root>"
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-config-consistency-audit/scripts/audit_proxy_consistency.py" "<proxyconfig-root>"
 ```
 
-```powershell
-& "<python>" "skills/proxy-dns-routing/scripts/audit_dns_routing.py" "D:\GitRepo\ProxyConfig" --airportservers --domain ctcxianyu.com
-```
+Surge split 同步由 ProxyConfig 的现有 workflow 负责，不新增一个重复的
+split skill。编辑 canonical full profile，报告 split drift，并等待 workflow
+完成后再使用需要 generated sync 已完成的验收项。
 
-```powershell
-& "<python>" "skills/proxy-rule-policy-routing/scripts/audit_rule_policy_refs.py" "D:\GitRepo\ProxyConfig"
-```
+## 设计边界
 
-```powershell
-& "<python>" "skills/proxy-config-consistency-audit/scripts/audit_proxy_consistency.py" "D:\GitRepo\ProxyConfig"
-```
-
-## 边界
-
-- 不实现 `sync-surge-split-config`，Surge split 同步交给现有 GitHub Action。
-- Provider source 维护没有单独拆成独立 skill，已经并入 `proxy-groups`。
-- `proxy-config-consistency-audit` 是只读审计入口；需要修复时，再切到更具体的维护 skill。
-- skill 内部不放额外 README；具体操作模型放在各自 `references/` 下，脚本放在各自 `scripts/` 下。
+- 普通 group、DNS、rule 工作分别由前三个 domain skill 负责；generated
+  skill 只在跨越 writer 合同时触发。
+- 同一物理文件允许多个 writer，但 marker/field scope 必须不重叠且共享同一
+  concurrency group。
+- generated 文件只能由授权 repo-owned CLI/generator 生成；手工配置主体和
+  canonical input 保持在其各自 scope。
+- consistency audit 是只读入口；需要修复时转交具体 domain skill，再由
+  generated skill 负责生成/发布验收。
+- 不在 skill 内复制仓库同步算法、provider inventory 或 secret-bearing source。

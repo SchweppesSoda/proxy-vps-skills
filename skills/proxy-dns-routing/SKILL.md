@@ -1,62 +1,87 @@
 ---
 name: proxy-dns-routing
-description: Maintain DNS routing in the user's ProxyConfig repository for Egern, Mihomo, and Surge. Use when updating AirportServers DNS forwarding, airport node-domain DNS policies, provider-specific DoH overrides, DNS upstream groups, Surge Host mappings, Egern dns.forward rules, Mihomo proxy-server-nameserver-policy entries, or DNS leak/HTTPDNS-related routing behavior. Always inspect AirportServers references and run the bundled DNS audit before editing.
+description: Maintain DNS routing across the user's Mihomo, Surge, Stash, Loon, and Egern configurations. Use for AirportServers, airport node-domain resolution, provider-specific DoH, Egern dns.forward, Mihomo proxy-server-nameserver-policy, Surge Host mappings, DNS leak handling, and HTTPDNS behavior. Ordinary DNS edits stay here; hand off to proxy-generated-config-sync when they change an automation writer, generated marker/field, whole-file derivative, or cross-repository publication.
 ---
 
 # Maintain Proxy DNS Routing
 
-## Core Rule
+Treat DNS changes as resolution-path changes, not simple text edits. Identify
+which client resolves the hostname, whether it is a node server or app domain,
+which upstream is selected, and whether the same semantic rule is represented
+in each applicable client.
 
-Treat DNS changes as resolution-path changes, not simple text edits. Before editing, identify which client resolves the hostname, which upstream or DoH is selected, whether the rule targets node server domains or app traffic, and whether the same domain needs entries in Egern, Mihomo, Surge, or an external AirportServers list.
+## Scope and writer boundary
 
-This skill does not maintain Surge split synchronization. If Surge split files differ from `Surge/AutoSurge.conf`, report the drift and leave synchronization to the repository's GitHub Action.
+This skill owns DNS semantics and per-client projections. It does not own the
+Airport DNS or Provider Compatibility generator implementation. Load
+`$proxy-generated-config-sync` with this skill when the task touches a writer
+input, marker/field, shared file lock, transaction, or CustomRules publication.
+A normal manual DNS mapping does not activate the generated-writer skill by
+itself.
 
-## First Steps
+The two automated pipelines are independent:
 
-1. Locate the ProxyConfig repo. Prefer the current workspace when it contains `Mihomo/`, `Surge/`, and `Egern/`.
-2. Read files as UTF-8. Do not trust mojibake shown by default PowerShell output.
-3. Run the DNS audit helper before edits:
-
-```powershell
-& "<python>" "<skill>/scripts/audit_dns_routing.py" "D:\GitRepo\ProxyConfig" --domain ctcxianyu.com --domain 525536.xyz
+```text
+  Airport DNS inventory -> Stash/Loon Airport DNS markers + CustomRules sources
+Provider Compatibility -> provider-compat markers in client configs
 ```
 
-For AirportServers-specific work, run:
+Their marker scopes and logic must not be conflated, even when they write the
+same physical Stash or Loon file.
+
+## First steps
+
+1. Resolve `<proxyconfig-root>` from the current checkout and
+   `<proxy-vps-skills-root>` from the skill checkout; do not assume a drive or
+   copied installation path.
+2. Read `Sub-Store/config/airport-domain-sources.json`,
+   `Sub-Store/config/provider-compat/registry.json`, and
+   `Sub-Store/config/generated-writers.json` when the task involves an
+   automated source or generated output.
+3. Run the bundled DNS audit before edits:
 
 ```powershell
-& "<python>" "<skill>/scripts/audit_dns_routing.py" "D:\GitRepo\ProxyConfig" --airportservers
+& "<python>" "<proxy-vps-skills-root>/skills/proxy-dns-routing/scripts/audit_dns_routing.py" "<proxyconfig-root>" --airportservers
 ```
 
-Read `references/dns-routing-model.md` before making cross-client DNS edits or updating AirportServers behavior.
+Add `--domain "<domain>"` for a focused view. Read
+`references/dns-routing-model.md` before cross-client or AirportServers work.
+4. Use UTF-8 reads and `rg` for exact, wildcard, provider, and remote-list
+   references. Inspect capability-bearing values through the writer's masking
+   path; do not print raw URLs or tokens.
 
-## Required Decisions
+## Semantic workflow
 
-Ask only when the repo cannot answer the decision:
+1. Classify each hostname as an airport node server, provider compatibility
+   host/alias, app/service domain, or mixed use. Select the resolver based on
+   the capability and bootstrapping path, not on the display name.
+2. Compare all applicable surfaces: Mihomo Mobile/OpenWrt/Safe, Surge Full,
+   Stash, Loon, and Egern. Client asymmetry is acceptable when the client or
+   workflow lacks an equivalent feature; report it explicitly.
+3. Edit minimal manual/canonical surfaces:
+   - Egern `dns.upstreams` and `dns.forward`;
+   - Mihomo `dns.proxy-server-nameserver-policy`, `nameserver`, and related
+     resolver keys;
+   - Surge Full `[Host]` and DNS keys; split Host output is generated from the
+     full profile;
+   - Stash/Loon manual DNS areas when no writer owns the target range.
+4. For AirportServers or Provider Compatibility changes, invoke the
+   repository-owned CLI and tests. Never hand-edit a generated marker or
+   reconstruct its algorithm in the skill.
+5. Re-run the DNS audit and the generated-writer checks when applicable, then
+   report scanned clients, generated scopes, intentional exclusions, and any
+   external CustomRules publication still pending.
 
-- Whether a domain is a proxy node server domain, an app/service domain, or both.
-- Which resolver should be authoritative: default domestic DNS, international DoH, provider-specific DoH, system/router DNS, or a named Egern upstream.
-- Whether AirportServers should be updated externally, referenced remotely, or replaced by local per-client entries.
-- Whether a change should apply to all clients or only to the client named by the user.
+## Resolver invariants
 
-## Edit Workflow
-
-1. Audit current entries for every raw domain and list URL, including wildcard variants such as `example.com`, `*.example.com`, and `+.example.com`.
-2. Classify the change:
-   - AirportServers list update: node server domain inventory.
-   - Provider-specific DNS override: a provider requires a special DoH.
-   - Resolver policy change: upstream choice or ordering changes.
-   - DNS-leak hardening: default/proxy/direct resolver strategy changes.
-3. Edit the minimal client-specific DNS surfaces:
-   - Egern: `dns.upstreams` and `dns.forward`.
-   - Mihomo: `dns.proxy-server-nameserver`, `proxy-server-nameserver-policy`, `nameserver`, or `direct-nameserver`.
-   - Surge: `[Host]` / `Host.dconf`, general DNS keys, and comments when they document active behavior.
-4. Re-run `audit_dns_routing.py` and `rg` for all domains and list URLs.
-5. Report client coverage, intentional asymmetry, and any AirportServers update that must happen outside this repo.
-
-## Validation
-
-- DNS audit shows the intended resolver for each requested domain or AirportServers URL.
-- `rg` confirms no stale wildcard variant remains.
-- The change does not silently remove provider-specific DoH entries.
-- Egern upstream names referenced by `dns.forward` exist in `dns.upstreams`.
-- Mihomo policy entries use the correct wildcard style (`+.domain`) and Surge host entries use the correct style (`*.domain = server:...`).
+- Egern `dns.forward` values must exist under `dns.upstreams`.
+- Mihomo proxy-node domains must not depend on a resolver that requires the
+  proxy to be running first.
+- Preserve wildcard style: Egern suffix matches, Mihomo `+.domain`, and
+  Surge `*.domain = server:<resolver>` where the client supports it.
+- Keep app DNS rules distinct from proxy-server/node-domain rules.
+- Provider-specific DoH must remain present until every consumer is audited;
+  removing an upstream because one mapping disappeared is unsafe.
+- CTC-specific remote lists and pinned/manual entries are separate from the
+  Airport DNS generated marker unless the active writer contract says
+  otherwise.

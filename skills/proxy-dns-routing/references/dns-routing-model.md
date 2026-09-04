@@ -1,39 +1,76 @@
 # ProxyConfig DNS Routing Model
 
-## File Map
+## Client surfaces and source of truth
 
-- `Egern/AutoEgern.yaml`: `dns.upstreams` defines resolver groups; `dns.forward` maps SSID, domains, or remote rule sets to those groups.
-- `Mihomo/AutoMihomo.yaml`: `dns.proxy-server-nameserver-policy` maps proxy node domains to resolvers; `nameserver` and `direct-nameserver` define default behavior.
-- `Surge/Split Conf/AutoSurge/Host.dconf`: host-level DNS mappings for domains such as provider node server domains.
-- `Surge/AutoSurge.conf`: full Surge profile. Do not maintain split synchronization manually unless explicitly requested.
+- Mihomo Mobile/OpenWrt/Safe profiles use
+  `dns.proxy-server-nameserver-policy`, `nameserver`, and related resolver
+  keys. Discover the maintained profiles under `Mihomo/`; do not use a generic
+  legacy profile path as a universal source.
+- Surge Full uses `Surge/AutoSurge.conf` for canonical `[Host]` and DNS
+  settings. `Surge/Split Conf/AutoSurge/Host.dconf` is generated output.
+- Stash uses its YAML DNS mappings; Loon uses its `[Host]`/resolver sections;
+  Egern uses `dns.upstreams` and `dns.forward`.
 
-## AirportServers
+The five clients can have intentional differences. Record why a projection is
+missing instead of silently manufacturing parity.
 
-AirportServers is the node-server-domain inventory used to route airport node domain resolution. In the current shape, Egern references the remote list:
+## Two automated writers
 
-`https://raw.githubusercontent.com/SchweppesSoda/CustomRules/refs/heads/master/Surge/AirportServers.list`
+### Airport DNS
 
-When updating AirportServers, distinguish:
+`Sub-Store/config/airport-domain-sources.json` selects the reviewed Mihomo
+Mobile profile and non-secret source metadata. The Airport DNS CLI discovers
+live node server domains and replaces only the `AUTO-GENERATED AIRPORT DNS`
+marker in:
 
-- The external list itself, which may live outside this repo.
-- Per-client DNS overrides for domains that need a special resolver.
-- Comments documenting why node server domains use a particular resolver.
+- `Stash/AutoStash.yaml`;
+- `Loon/AutoLoon.conf`.
 
-## Domain Style By Client
+The same run replaces the `AUTO-GENERATED PROVIDER DOMAINS` marker in
+CustomRules `sources/manual/AirportServers.yaml` and
+`AirportServersCTC.yaml`. CTC pinned entries remain outside the marker. The
+external source and local projections are separate repository targets but one
+reviewed writer/publication sequence.
 
-- Egern domain suffix: `match: example.com`, `value: UpstreamName`.
-- Egern rule set: `proxy_rule_set` with `match: <url>` and `value: UpstreamName`.
-- Mihomo proxy node policy: `"+.example.com": "<resolver>"`.
-- Surge host mapping: `*.example.com = server:<resolver>`.
+### Provider Compatibility
 
-## Common Operations
+`Sub-Store/config/provider-compat/registry.json` and its provider JSON files
+describe non-secret policy. The Provider Compatibility CLI writes only its
+`AUTO-GENERATED PROVIDER-COMPAT REAL-IP` and
+`AUTO-GENERATED PROVIDER-COMPAT HOSTS` ranges in the applicable Mihomo,
+Stash, Egern, and Loon files. It does not own Airport DNS mappings, Surge
+Host output, or CustomRules rule sources. Its OpenWrt baseline output is
+passed to the WAN2 generator; WAN2 remains a whole-file derivative owned by
+that generator.
 
-- Add provider-specific DoH: add or update Egern upstream if needed, add Egern domain suffix mappings, add Mihomo `proxy-server-nameserver-policy`, add Surge Host entries.
-- Update AirportServers: inspect all current references, confirm whether the source list is external, then update only local references or entries requested by the user.
-- Remove provider DNS override: remove all wildcard variants and any provider-specific upstream only if no other domain uses it.
+Both writers can touch Stash and Loon physically, so they must use the same
+`generated-file-writers-main` concurrency group and non-overlapping markers.
+The generated-writer index is the compact ownership map; the automation docs,
+CLI, and tests provide the detailed parser/render/transaction contract.
 
-## Safety Checks
+## Domain projection rules
 
-- Egern `value` names in `dns.forward` must exist under `dns.upstreams`.
-- Provider node domains should generally not be routed through a resolver that depends on the proxy being already available.
-- Do not conflate DNS rules for app traffic with node server DNS rules.
+- Airport node-server inventory is not the same as provider fake-IP/hosts
+  compatibility. Do not add compatibility suffixes to AirportServers merely
+  because both are DNS-related.
+- Egern's AirportServers remote rule set is an external projection. A CTC
+  remote list or provider-specific Egern mapping is not automatically changed
+  by the Airport DNS CLI.
+- Stash Airport DNS maps suffixes to its domestic resolver list; Loon projects
+  the corresponding host mappings to its configured resolver. Use the active
+  manifest and writer rather than copying one client's syntax to another.
+- Surge Host mappings for ordinary queries do not prove that proxy-server
+  hostname resolution is covered. Preserve the documented client limitation
+  and report any unresolved proxy-server requirement.
+
+## Validation checklist
+
+1. Run `audit_dns_routing.py` for AirportServers and each requested domain.
+2. Check Egern upstream references and wildcard forms, Mihomo policy keys,
+   Surge Full Host entries, and manual Stash/Loon sections.
+3. If a writer is involved, run its dry-run/check mode, marker/ownership test,
+   client validators, and `git diff --check` as declared by its workflow.
+4. Confirm no raw capability URL, token, credential, or full provider source
+   was copied into a manifest, generated index, log, or report.
+5. Report external CustomRules changes separately; no local audit can pretend
+   that an unpushed cross-repository source is already published.
