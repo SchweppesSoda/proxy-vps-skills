@@ -109,3 +109,7 @@ split skill。编辑 canonical full profile，报告 split drift，并等待 wor
 - consistency audit 是只读入口；需要修复时转交具体 domain skill，再由
   generated skill 负责生成/发布验收。
 - 不在 skill 内复制仓库同步算法、provider inventory 或 secret-bearing source。
+
+## 仓库维护入口
+
+[AGENTS.md](./AGENTS.md) 记录本仓 `main`、单仓写入、验证与提交约定。此仓只维护工作流和审计工具；公共规则源与发布在 [CustomRules](https://github.com/SchweppesSoda/CustomRules)，运维脚本在 [VPS-Toolkit](https://github.com/SchweppesSoda/VPS-Toolkit)，配置及设备恢复资料在各自私有仓库。文档整理不更新已安装 skill 副本。
