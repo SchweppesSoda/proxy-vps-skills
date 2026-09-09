@@ -75,9 +75,10 @@ credential-bearing value.
 
 ## Handoff checks
 
-After a CustomRules source change, run the rule-policy audit only after the
-artifact branch has been rebuilt, or explicitly report that the consumer is
-waiting for `auto-build`. After a generated client change, run the relevant
-client validator and the global consistency audit. Keep the generated writer
-skill loaded until ownership, source-of-truth, and publication status are all
-reported.
+Validate local rule/reference changes immediately where possible; live artifact
+verification waits for the relevant build. After a generated client change,
+run that client's applicable checks. Use the global audit only for requested
+global coverage or evidence of cross-pipeline drift. Report local source,
+generated artifact and consumer publication state separately. Existing session
+authorization covers its stated publication scope; otherwise prepare a validated
+local result and request authorization only for the external action.

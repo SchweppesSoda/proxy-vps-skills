@@ -1,7 +1,7 @@
 interface:
   display_name: "Proxy Config Audit"
-  short_description: "Read-only audit for five-client config and writer drift."
-  default_prompt: "Use $proxy-config-consistency-audit to audit five-client config, generated-writer ownership, and CustomRules drift."
+  short_description: "Inspect cross-client or generated config drift."
+  default_prompt: "Use $proxy-config-consistency-audit to inspect the requested consistency scope and report findings."
 
 policy:
   allow_implicit_invocation: true

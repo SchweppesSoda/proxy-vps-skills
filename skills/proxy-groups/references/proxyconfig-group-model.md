@@ -43,8 +43,9 @@ merged.
 
 Audit the old and new source host/path, provider key, collection, cache path,
 prefix, and policy path. Change only source metadata when visible group names
-are stable. Verify with the repository-owned provider URL tools, and redact
-capability URLs and tokens in all output.
+are stable. Use `Sub-Store/tools/sync_provider_urls.py` and
+`Sub-Store/tools/verify_provider_urls.py` when their existing modes cover the
+requested source change. Redact capability URLs and tokens in all output.
 
 ### Add or split
 

@@ -1,7 +1,7 @@
 interface:
   display_name: "Proxy DNS Routing"
-  short_description: "Maintain five-client DNS projections and AirportServers."
-  default_prompt: "Use $proxy-dns-routing to update DNS semantics or AirportServers with an audit and generated handoff when needed."
+  short_description: "Maintain resolvers and node/domain DNS mappings."
+  default_prompt: "Use $proxy-dns-routing to update the requested DNS mapping and verify its resolution path."
 
 policy:
   allow_implicit_invocation: true

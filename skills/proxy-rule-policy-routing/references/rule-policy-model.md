@@ -12,9 +12,9 @@ auto-build generated YAML/MRS/LIST + manifest/checksums
 ```
 
 Edit reviewed sources on `master`; never hand-edit files on `auto-build`.
-After a source or builder change, run the CustomRules tests and deterministic
-builder/verification workflow before updating or declaring client consumers
-current. The branch and artifact path in each canonical client configuration
+For source or builder changes, choose tests covering the changed behavior.
+Before publication or switching consumers, complete the applicable deterministic
+build and artifact verification gates; a local edit is not a live artifact. The branch and artifact path in each canonical client configuration
 are part of the contract.
 
 If a source change also touches a generated marker, selected field, whole-file
@@ -115,12 +115,26 @@ service icon field: Stash `icon`, Egern `icon`, and Loon Full `img-url`.
 
 ## Mihomo Kernel Validation Contract
 
-After changing any Mihomo profile, validate Mobile, OpenWrt, and SafeMihomo
-with the pinned Mihomo version and archive checksum declared by CustomRules.
+After behavioral changes to Mihomo profiles, validate the changed profiles and
+affected generated derivatives with the pinned Mihomo version and archive
+checksum declared by CustomRules. Comments or documentation alone do not need
+a kernel run. Expand to other profiles only for shared parser/template changes
+or evidence of a shared failure.
 Use an isolated working directory for each profile, seed `GeoSite.dat`, and run
 `mihomo -t -f`. A YAML parser only proves syntax; the kernel check additionally
 loads Mihomo fields, groups, rules, and the geosite-backed fake-IP filters. It
 does not replace rule-order, undefined-policy, provider-type, or URL audits.
+
+The bundled `scripts/validate_mihomo_configs.py` accepts repeatable `--config`
+paths relative to the repository. Example (substitute verified local paths):
+
+```text
+python scripts/validate_mihomo_configs.py <repo> --mihomo <verified-kernel> --geosite <GeoSite.dat> --config Mihomo/AutoMihomo.Mobile.yaml
+```
+
+Run from this skill directory. With no `--config`, the helper checks its default
+profile set; use that broader mode only when needed. Missing tooling is a
+reported verification limit, not a reason to run unrelated tests.
 
 ## Common Policy Targets
 

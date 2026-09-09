@@ -65,7 +65,9 @@ CLI, and tests provide the detailed parser/render/transaction contract.
 
 ## Validation checklist
 
-1. Run `audit_dns_routing.py` for AirportServers and each requested domain.
+1. Check the requested domain/mapping; use `audit_dns_routing.py --domain` when
+   helpful. Include `--airportservers` only when the inventory or lists change.
+   A focused search is sufficient for a narrow, understood manual mapping.
 2. Check Egern upstream references and wildcard forms, Mihomo policy keys,
    Surge Full Host entries, and manual Stash/Loon sections.
 3. If a writer is involved, run its dry-run/check mode, marker/ownership test,

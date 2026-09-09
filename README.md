@@ -10,9 +10,9 @@
 | Skill | 用途 | 触发边界 |
 | --- | --- | --- |
 | `proxy-groups` | 维护代理组、provider source、Sub-Store collection、节点前缀和消费者引用。 | 普通 provider/group 身份、成员和 source 变更；跨 generated writer 时联合 `proxy-generated-config-sync`。 |
-| `proxy-dns-routing` | 维护 AirportServers、机场节点域名、DoH、DNS upstream、Host 映射和 HTTPDNS 路由。 | 普通 DNS 语义和人工投影；涉及 Airport DNS/Provider Compatibility writer 时联合 generated skill。 |
+| `proxy-dns-routing` | 维护 AirportServers、机场节点域名、DoH、DNS upstream、Host 映射和实际 DNS 解析。 | 普通 DNS 语义和人工投影；涉及 Airport DNS/Provider Compatibility writer 时联合 generated skill。 |
 | `proxy-rule-policy-routing` | 维护 rule-provider、规则顺序和 rule-to-policy 映射。 | 普通规则与策略语义；涉及 CustomRules build、marker 或派生文件时联合 generated skill。 |
-| `proxy-config-consistency-audit` | 只读编排五客户端、规则、DNS、provider 和 generated writer 一致性。 | 变更前后审计、漂移定位和验收，不直接修改配置。 |
+| `proxy-config-consistency-audit` | 只读编排五客户端、规则、DNS、provider 和 generated writer 一致性。 | 用户要求的审计或跨领域漂移；不作为每次修改的前后置门禁。 |
 | `proxy-generated-config-sync` | 维护 generated writer ownership、marker/field/whole-file scope、锁、事务和跨仓发布边界。 | 仅用于 Airport DNS、Provider Compatibility、OpenWrt→WAN2、Surge full→split、CustomRules 发布及 writer 合同。 |
 
 ## 安装
@@ -112,4 +112,27 @@ split skill。编辑 canonical full profile，报告 split drift，并等待 wor
 
 ## 仓库维护入口
 
-[AGENTS.md](./AGENTS.md) 记录本仓 `main`、单仓写入、验证与提交约定。此仓只维护工作流和审计工具；公共规则源与发布在 [CustomRules](https://github.com/SchweppesSoda/CustomRules)，运维脚本在 [VPS-Toolkit](https://github.com/SchweppesSoda/VPS-Toolkit)，配置及设备恢复资料在各自私有仓库。文档整理不更新已安装 skill 副本。
+[AGENTS.md](./AGENTS.md) 记录本仓 `main`、单仓写入、验证与提交约定。此仓只维护工作流和审计工具；公共规则源与发布在 [CustomRules](https://github.com/SchweppesSoda/CustomRules)，运维脚本在 [VPS-Toolkit](https://github.com/SchweppesSoda/VPS-Toolkit)，配置及设备恢复资料在各自私有仓库。修改 skill 入口、引用或 UI 元数据时同步对应个人安装副本；仅仓库 README/AGENTS 修改不重装 skill。
+
+
+## 渐进读取与完成标准
+
+`SKILL.md` 只保留能力边界、路由和关键合同；`references/` 承载有条件的业务细节。
+从任务对象与直接消费者开始，重命名/删除共享身份才扩展引用检查。无需每次
+先后运行全局审计。`--target`、`--domain`、`--policy` 主要聚焦报告，脚本仍可执行
+共享检查；不要把既有无关发现自动升级为本次修复范围。Mihomo kernel helper 用
+重复 `--config` 限定受影响 profiles。正式生成/发布保留对应门禁。
+
+本地完成包括请求的修改、相关生成/检查、文档和范围明确的提交。已授权的操作
+继续执行；没有发布授权时报告已完成的本地结果和待发布状态。
+
+路由复核示例：
+
+| 请求 | 主路由及范围 |
+| --- | --- |
+| 只改一个人工 DNS mapping | DNS；该 mapping/upstream 引用，非全部 writer |
+| 把某服务改到已有策略组 | Rule；目标与邻接顺序，不重做组定义 |
+| provider 改名并清理消费者 | Groups；跨客户端 aliases，存在 rule 消费者才联动 Rule |
+| 修复 WAN2 生成逻辑 | Generated；WAN2 tests/check 与受影响语义，非全部流水线 |
+| 审计并修复所有客户端漂移 | Audit 后按发现进入维护路由；原请求已包含修复授权 |
+| 只改 Skill 或 README | 指令/frontmatter/链接核验，不运行真实配置生成、部署或全套业务测试 |
