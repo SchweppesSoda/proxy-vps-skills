@@ -15,8 +15,17 @@ from pathlib import Path
 DEFAULT_CONFIGS = (
     Path("Mihomo/AutoMihomo.Mobile.yaml"),
     Path("Mihomo/AutoMihomo.OpenWrt.yaml"),
-    Path("Mihomo/SafeMihomo.yaml"),
 )
+
+
+def default_configs(repo: Path) -> list[Path]:
+    """Require maintained baselines; include the legacy minimal profile if present."""
+    configs = list(DEFAULT_CONFIGS)
+    optional = Path("Mihomo/SafeMihomo.yaml")
+    if (repo / optional).exists():
+        configs.append(optional)
+    return configs
+
 
 URL_RE = re.compile(
     r"(?i)\b(?:https?|ftp|socks5?|ssr?|vmess|vless|trojan|hysteria2?|tuic|wireguard)://[^\s'\"<>]+"
@@ -122,7 +131,7 @@ def main() -> int:
             args.repo,
             args.mihomo,
             args.geosite,
-            args.configs or list(DEFAULT_CONFIGS),
+            args.configs or default_configs(args.repo),
         )
     except (OSError, RuntimeError) as exc:
         print(f"error: {redact_text(str(exc))}", file=sys.stderr)

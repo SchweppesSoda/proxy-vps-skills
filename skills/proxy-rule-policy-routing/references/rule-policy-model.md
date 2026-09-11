@@ -133,7 +133,9 @@ python scripts/validate_mihomo_configs.py <repo> --mihomo <verified-kernel> --ge
 ```
 
 Run from this skill directory. With no `--config`, the helper checks its default
-profile set; use that broader mode only when needed. Missing tooling is a
+Mobile and OpenWrt baselines, plus SafeMihomo only when that legacy file exists.
+An explicit `--config` remains required even if the selected file is missing.
+Use the broader default mode only when needed. Missing tooling is a
 reported verification limit, not a reason to run unrelated tests.
 
 ## Common Policy Targets

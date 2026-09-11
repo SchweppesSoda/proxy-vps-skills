@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import sys
 import unittest
+import tempfile
+from unittest import mock
 from pathlib import Path
 
 
@@ -15,6 +17,25 @@ SPEC.loader.exec_module(VALIDATOR)
 
 
 class ValidateMihomoConfigsTests(unittest.TestCase):
+    def test_defaults_include_legacy_profile_only_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            expected = [Path("Mihomo/AutoMihomo.Mobile.yaml"), Path("Mihomo/AutoMihomo.OpenWrt.yaml")]
+            self.assertEqual(VALIDATOR.default_configs(repo), expected)
+            optional = repo / "Mihomo/SafeMihomo.yaml"
+            optional.parent.mkdir()
+            optional.write_text("rules: []", encoding="utf-8")
+            self.assertEqual(VALIDATOR.default_configs(repo), expected + [optional.relative_to(repo)])
+
+    def test_cli_preserves_explicit_missing_profile_request(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            requested = Path("Mihomo/SafeMihomo.yaml")
+            argv = [str(SCRIPT), str(repo), "--mihomo", "kernel", "--geosite", "data", "--config", str(requested)]
+            with mock.patch.object(sys, "argv", argv), mock.patch.object(VALIDATOR, "validate_configs", return_value=2) as validate:
+                self.assertEqual(VALIDATOR.main(), 2)
+            self.assertEqual(validate.call_args.args[3], [requested])
+
     def test_kernel_output_is_redacted(self) -> None:
         sample = (
             "socks5://user:SOCKS_SECRET@host.example:1080\n"
