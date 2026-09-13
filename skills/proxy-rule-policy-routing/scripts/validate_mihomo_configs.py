@@ -38,7 +38,7 @@ SECRET_RE = re.compile(
     private[-_ ]?key|x[-_ ]?api[-_ ]?key|api[-_ ]?(?:key|secret|token)|
     access[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|auth[-_ ]?token|
     capability[-_ ]?token|bearer|token)\b["']?\s*[:=]\s*)
-    (?:"[^"]*"|'[^']*'|[^\s,;}\]]+)
+    (?:"[^"]*"|'[^']*'|[^\r\n,;}\]]+)
     """
 )
 BLOB_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{48,}(?![A-Za-z0-9])")

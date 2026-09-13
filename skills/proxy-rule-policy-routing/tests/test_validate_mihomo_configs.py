@@ -36,6 +36,14 @@ class ValidateMihomoConfigsTests(unittest.TestCase):
                 self.assertEqual(VALIDATOR.main(), 2)
             self.assertEqual(validate.call_args.args[3], [requested])
 
+    def test_unquoted_auth_headers_hide_scheme_and_credential(self) -> None:
+        for prefix in ("Authorization: Bearer", "Proxy-Authorization: Basic", "authorization=Bearer"):
+            with self.subTest(prefix=prefix):
+                rendered = VALIDATOR.redact_text(prefix + " fixture-key\nnext: visible")
+                self.assertNotIn("fixture-key", rendered)
+                self.assertIn("<redacted>", rendered)
+                self.assertIn("next: visible", rendered)
+
     def test_kernel_output_is_redacted(self) -> None:
         sample = (
             "socks5://user:SOCKS_SECRET@host.example:1080\n"
