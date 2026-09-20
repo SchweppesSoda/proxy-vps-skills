@@ -2,7 +2,7 @@
 
 这是给 `ProxyConfig` 使用的 Codex skills 集合，把跨客户端代理配置维护中
 容易漏改、容易漂移、容易误写 generated 文件的操作沉淀成可复用工作流。
-当前覆盖 Mihomo、Surge、Stash、Loon、Egern，以及与 CustomRules 的公开规则
+当前覆盖 Mihomo、Stash、Loon、Egern，以及与 CustomRules 的公开规则
 产物关系。
 
 ## Skills
@@ -13,7 +13,7 @@
 | `proxy-dns-routing` | 维护 AirportServers、机场节点域名、DoH、DNS upstream、Host 映射和实际 DNS 解析。 | 普通 DNS 语义和人工投影；涉及 Airport DNS/Provider Compatibility writer 时联合 generated skill。 |
 | `proxy-rule-policy-routing` | 维护 rule-provider、规则顺序和 rule-to-policy 映射。 | 普通规则与策略语义；涉及 CustomRules build、marker 或派生文件时联合 generated skill。 |
 | `proxy-config-consistency-audit` | 只读编排五客户端、规则、DNS、provider 和 generated writer 一致性。 | 用户要求的审计或跨领域漂移；不作为每次修改的前后置门禁。 |
-| `proxy-generated-config-sync` | 维护 generated writer ownership、marker/field/whole-file scope、锁、事务和跨仓发布边界。 | 仅用于 Airport DNS、Provider Compatibility、OpenWrt→WAN2、Surge full→split、CustomRules 发布及 writer 合同。 |
+| `proxy-generated-config-sync` | 维护 generated writer ownership、marker/field/whole-file scope、锁、事务和跨仓发布边界。 | 仅用于 Airport DNS、Provider Compatibility、OpenWrt→WAN2、CustomRules 发布及 writer 合同。 |
 
 ## 安装
 
@@ -42,8 +42,8 @@ npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-generated-config-syn
 ## Source of truth
 
 ```text
-Surge/AutoSurge.conf                    canonical full profile
-    └─ Surge/Split Conf/AutoSurge/       generated split output
+Egern/AutoEgern.yaml                   canonical combined profile
+    └─ Egern/AutoEgern.PO0{SH,GZ}.yaml generated PO0 profiles
 
 Mihomo/AutoMihomo.OpenWrt.yaml           canonical OpenWrt baseline
     └─ Mihomo/AutoMihomo.OpenWrt-WAN2.yaml generated whole-file derivative
@@ -83,7 +83,7 @@ CustomRules master sources               reviewed rule inputs
 
 ## 审计脚本
 
-命令中的 `<proxyconfig-root>` 是包含 `Mihomo/`、`Surge/`、`Stash/`、`Loon/`、
+命令中的 `<proxyconfig-root>` 是包含 `Mihomo/`、`Stash/`、`Loon/`、
 `Egern/` 的 checkout；`<proxy-vps-skills-root>` 是包含 `skills/` 的 checkout。
 不要把本机盘符或个人安装路径写进 skill、日志或提交：
 
@@ -94,9 +94,7 @@ CustomRules master sources               reviewed rule inputs
 & "<python>" "<proxy-vps-skills-root>/skills/proxy-config-consistency-audit/scripts/audit_proxy_consistency.py" "<proxyconfig-root>"
 ```
 
-Surge split 同步由 ProxyConfig 的现有 workflow 负责，不新增一个重复的
-split skill。编辑 canonical full profile，报告 split drift，并等待 workflow
-完成后再使用需要 generated sync 已完成的验收项。
+Egern PO0 与 OpenWrt WAN2 由 ProxyConfig 原生成器拥有。编辑维护源，报告派生漂移；共享 CustomRules `Surge/*.list` 名称继续供 Egern/Loon 消费，不代表维护 Surge 客户端。
 
 ## 设计边界
 

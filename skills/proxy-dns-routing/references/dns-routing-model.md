@@ -6,12 +6,10 @@
   `dns.proxy-server-nameserver-policy`, `nameserver`, and related resolver
   keys. Discover the maintained profiles under `Mihomo/`; do not use a generic
   legacy profile path as a universal source.
-- Surge Full uses `Surge/AutoSurge.conf` for canonical `[Host]` and DNS
-  settings. `Surge/Split Conf/AutoSurge/Host.dconf` is generated output.
 - Stash uses its YAML DNS mappings; Loon uses its `[Host]`/resolver sections;
   Egern uses `dns.upstreams` and `dns.forward`.
 
-The five clients can have intentional differences. Record why a projection is
+The maintained clients can have intentional differences. Record why a projection is
 missing instead of silently manufacturing parity.
 
 ## Two automated writers
@@ -38,8 +36,7 @@ reviewed writer/publication sequence.
 describe non-secret policy. The Provider Compatibility CLI writes only its
 `AUTO-GENERATED PROVIDER-COMPAT REAL-IP` and
 `AUTO-GENERATED PROVIDER-COMPAT HOSTS` ranges in the applicable Mihomo,
-Stash, Egern, and Loon files. It does not own Airport DNS mappings, Surge
-Host output, or CustomRules rule sources. Its OpenWrt baseline output is
+Stash, Egern, and Loon files. It does not own Airport DNS mappings or CustomRules rule sources. Its OpenWrt baseline output is
 passed to the WAN2 generator; WAN2 remains a whole-file derivative owned by
 that generator.
 
@@ -59,9 +56,6 @@ CLI, and tests provide the detailed parser/render/transaction contract.
 - Stash Airport DNS maps suffixes to its domestic resolver list; Loon projects
   the corresponding host mappings to its configured resolver. Use the active
   manifest and writer rather than copying one client's syntax to another.
-- Surge Host mappings for ordinary queries do not prove that proxy-server
-  hostname resolution is covered. Preserve the documented client limitation
-  and report any unresolved proxy-server requirement.
 
 ## Validation checklist
 
@@ -69,7 +63,7 @@ CLI, and tests provide the detailed parser/render/transaction contract.
    helpful. Include `--airportservers` only when the inventory or lists change.
    A focused search is sufficient for a narrow, understood manual mapping.
 2. Check Egern upstream references and wildcard forms, Mihomo policy keys,
-   Surge Full Host entries, and manual Stash/Loon sections.
+   and manual Stash/Loon sections.
 3. If a writer is involved, run its dry-run/check mode, marker/ownership test,
    client validators, and `git diff --check` as declared by its workflow.
 4. Confirm no raw capability URL, token, credential, or full provider source

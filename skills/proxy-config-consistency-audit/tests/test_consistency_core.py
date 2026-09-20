@@ -79,7 +79,7 @@ class ConsistencyCoreTests(unittest.TestCase):
 
     def make_repo(self, root: Path) -> Path:
         repo = root / "ProxyConfig"
-        for client in ("Egern", "Mihomo", "Surge", "Loon", "Stash"):
+        for client in ("Egern", "Mihomo", "Loon", "Stash"):
             (repo / client).mkdir(parents=True, exist_ok=True)
         (repo / ".github/workflows").mkdir(parents=True)
         (repo / "Sub-Store/scripts").mkdir(parents=True)
@@ -116,8 +116,9 @@ Service = select,DIRECT
 [Rule]
 FINAL,Service
 """
-        (repo / "Surge/AutoSurge.conf").write_text(ini_config, encoding="utf-8")
         (repo / "Loon/AutoLoon.conf").write_text(ini_config, encoding="utf-8")
+        (repo / "Surge").mkdir()
+        (repo / "Surge/AutoSurge.conf").write_text(ini_config, encoding="utf-8")
 
         marker_text = """# BEGIN AUTO-GENERATED TEST
 token: https://example.invalid/sub?token=top-secret
@@ -173,7 +174,7 @@ token: https://example.invalid/sub?token=top-secret
             payload = audit.audit(repo, [])
             self.assertEqual(payload["environment_errors"], [])
             self.assertEqual(payload["issues"], [])
-            self.assertEqual({item["client"] for item in payload["scanned"]}, {"Egern", "Mihomo", "Surge", "Loon", "Stash"})
+            self.assertEqual({item["client"] for item in payload["scanned"]}, {"Egern", "Mihomo", "Loon", "Stash"})
             self.assertIn("Mihomo/Generated.yaml", {item["path"] for item in payload["skipped"]})
             self.assertEqual(payload["summary"]["generated"], 2)
 

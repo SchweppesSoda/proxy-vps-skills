@@ -17,8 +17,6 @@
   duplicate marker, overlapping selector, or mismatched shared lock.
 - A generated target differs from its canonical input/expected generator, a
   workflow diff exceeds its allowlist, or a generated result was hand-edited.
-- Surge split differs from `Surge/AutoSurge.conf` outside the workflow's normal
-  synchronization window.
 - A CustomRules consumer uses the wrong branch or artifact family, or the
   source/build/checksum chain is incomplete.
 
@@ -28,8 +26,6 @@
   provider, DNS projection, or service rule.
 - SafeMihomo and Loon Lite deliberately contain a reduced service set while
   preserving the applicable order.
-- Surge split files are transiently stale while their workflow is queued or
-  running; report this as generated drift, not a manual-edit instruction.
 - Provider Compatibility and Airport DNS share Stash/Loon physical files but
   own distinct, non-overlapping marker pairs under the same concurrency lock.
 - A provider can be client-specific because its source, collection, or

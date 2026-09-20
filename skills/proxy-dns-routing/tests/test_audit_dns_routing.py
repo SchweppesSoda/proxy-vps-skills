@@ -28,6 +28,7 @@ def write_json(root: Path, relative: str, document: object) -> None:
 
 
 def make_client_fixture(root: Path) -> None:
+    write_file(root, "Surge/Retired.conf", "[Host]\nretired.example = 1.1.1.1\n")
     write_file(root, "Egern/AutoEgern.yaml", """
         dns:
           upstreams:
@@ -66,16 +67,6 @@ def make_client_fixture(root: Path) -> None:
         dns:
           proxy-server-nameserver-policy:
             safe-only.example.com: cn
-    """)
-    write_file(root, "Surge/AutoSurge.conf", """
-        [Host]
-        surge.example.com = server:1.1.1.1
-        [General]
-        dns-server = https://dns.example/dns-query
-    """)
-    write_file(root, "Surge/Split Conf/AutoSurge/Host.dconf", """
-        [Host]
-        split-only.example.com = server:9.9.9.9
     """)
     write_file(root, "Loon/AutoLoon.conf", """
         [Host]
@@ -178,12 +169,11 @@ class AuditDnsRoutingTests(unittest.TestCase):
             self.assertEqual(payload["exit_code"], 0)
             self.assertEqual(
                 {item["client"] for item in payload["scanned"]},
-                {"Egern", "Mihomo", "Surge", "Loon", "Stash"},
+                {"Egern", "Mihomo", "Loon", "Stash"},
             )
             skipped = {item["path"] for item in payload["skipped"]}
             self.assertIn("Mihomo/AutoMihomo.OpenWrt-WAN2.yaml", skipped)
             self.assertNotIn("Mihomo/SafeMihomo.yaml", skipped)
-            self.assertIn("Surge/Split Conf/AutoSurge/Host.dconf", skipped)
             hit_files = {item["file"] for item in payload["dns_hits"]}
             self.assertFalse(any("WAN2" in path or "Split Conf" in path for path in hit_files))
             self.assertIn("Mihomo/SafeMihomo.yaml", hit_files)
@@ -191,7 +181,6 @@ class AuditDnsRoutingTests(unittest.TestCase):
             hit_kinds = {item["kind"] for item in payload["dns_hits"]}
             self.assertIn("egern-domain", hit_kinds)
             self.assertIn("mihomo-proxy-server-nameserver-policy", hit_kinds)
-            self.assertIn("surge-host", hit_kinds)
             self.assertIn("loon-host", hit_kinds)
             self.assertIn("stash-nameserver-policy", hit_kinds)
             self.assertTrue(any(item["scope"] == "whole-file" for item in payload["generated"]))
@@ -276,7 +265,7 @@ class AuditDnsRoutingTests(unittest.TestCase):
     def test_airportservers_and_payload_redaction(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            write_file(root, "Surge/AutoSurge.conf", """
+            write_file(root, "Loon/AutoLoon.conf", """
                 [Host]
                 secret.example.com = https://user:token123@dns.example/dns-query?token=token123
             """)

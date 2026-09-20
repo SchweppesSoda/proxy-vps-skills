@@ -21,11 +21,6 @@ CLIENT_FILES = {
         "Mihomo/SafeMihomo.yaml",
     ),
     "Stash": ("Stash/AutoStash.yaml",),
-    "Surge": (
-        "Surge/AutoSurge.conf",
-        "Surge/Split Conf/AutoSurge/ProxyGroup.dconf",
-        "Surge/Split Conf/AutoSurge/Rule.dconf",
-    ),
     "Loon": ("Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf"),
 }
 FULL_ORDER_FILES = {
@@ -33,7 +28,6 @@ FULL_ORDER_FILES = {
     "Mihomo/AutoMihomo.Mobile.yaml": "Mihomo",
     "Mihomo/AutoMihomo.OpenWrt.yaml": "Mihomo",
     "Stash/AutoStash.yaml": "Stash",
-    "Surge/AutoSurge.conf": "Surge",
     "Loon/AutoLoon.conf": "Loon",
 }
 ORDER_FILES = {
@@ -67,7 +61,7 @@ MIHOMO_RULE_TYPES = {
     "IP-CIDR6",
     "PROCESS-NAME",
 }
-SURGE_RULE_PATTERN = re.compile(
+INI_RULE_PATTERN = re.compile(
     r"^(RULE-SET|DOMAIN|DOMAIN-SUFFIX|DOMAIN-KEYWORD|"
     r"IP-CIDR|IP-CIDR6|GEOIP|PROCESS-NAME|USER-AGENT|URL-REGEX|FINAL),"
 )
@@ -161,8 +155,6 @@ def normalized_rel(path: str) -> str:
 
 def policy_scope(client: str, file: str) -> tuple[str, str]:
     normalized = normalized_rel(file)
-    if client == "Surge" and normalized.endswith("/Rule.dconf"):
-        normalized = normalized.rsplit("/", 1)[0] + "/ProxyGroup.dconf"
     return client, normalized
 
 
@@ -419,7 +411,7 @@ def parse_conf_rule(
     repo: Path, client: str, path: Path, index: int, line: str
 ) -> RuleRef | None:
     stripped = line.strip()
-    if not stripped or stripped.startswith("#") or not SURGE_RULE_PATTERN.match(stripped):
+    if not stripped or stripped.startswith("#") or not INI_RULE_PATTERN.match(stripped):
         return None
     parts = [part.strip() for part in stripped.split(",")]
     if parts[0] == "FINAL" and len(parts) >= 2:
@@ -431,20 +423,6 @@ def parse_conf_rule(
     else:
         return None
     return RuleRef(client, rel(path, repo), index, policy, rule, parts[0], stripped)
-
-
-def extract_conf_rules(repo: Path, client: str, path: Path) -> list[RuleRef]:
-    lines = read_lines(path)
-    if path.name == "Rule.dconf":
-        candidates = list(enumerate(lines, start=1))
-    else:
-        candidates = conf_sections(lines).get("rule", [])
-    refs: list[RuleRef] = []
-    for index, line in candidates:
-        parsed = parse_conf_rule(repo, client, path, index, line)
-        if parsed:
-            refs.append(parsed)
-    return refs
 
 
 def extract_loon_rules(repo: Path, path: Path) -> list[RuleRef]:
@@ -925,36 +903,6 @@ def audit_loon_tags(refs: list[RuleRef]) -> list[OrderViolation]:
     return violations
 
 
-def audit_generated_sync(refs: list[RuleRef]) -> list[CheckViolation]:
-    grouped = refs_by_file(refs)
-    full = grouped.get("Surge/AutoSurge.conf", [])
-    split = grouped.get("Surge/Split Conf/AutoSurge/Rule.dconf", [])
-    if not full or not split:
-        return []
-    signature = lambda item: (item.kind, item.rule, item.policy)
-    full_signatures = [signature(item) for item in full]
-    split_signatures = [signature(item) for item in split]
-    if full_signatures == split_signatures:
-        return []
-    mismatch = next(
-        (
-            index
-            for index, pair in enumerate(zip(full_signatures, split_signatures))
-            if pair[0] != pair[1]
-        ),
-        min(len(full_signatures), len(split_signatures)),
-    )
-    return [
-        CheckViolation(
-            "Surge",
-            "Surge/Split Conf/AutoSurge/Rule.dconf",
-            split[mismatch].line if mismatch < len(split) else 0,
-            "Surge Full/Split",
-            f"generated Rule.dconf differs at rule {mismatch + 1} (full={len(full)}, split={len(split)})",
-        )
-    ]
-
-
 def audit(repo: Path, filters: list[str]) -> dict[str, object]:
     repo = repo.resolve()
     filter_set = {item.casefold() for item in filters}
@@ -973,11 +921,6 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
                 defs.extend(extract_yaml_policy_defs(repo, client, path))
                 refs.extend(extract_mihomo_rules(repo, client, path))
                 providers.extend(extract_yaml_provider_defs(repo, client, path))
-            elif client == "Surge":
-                if path.name in {"AutoSurge.conf", "ProxyGroup.dconf"}:
-                    defs.extend(extract_conf_policy_defs(repo, client, path))
-                if path.name in {"AutoSurge.conf", "Rule.dconf"}:
-                    refs.extend(extract_conf_rules(repo, client, path))
             elif client == "Loon":
                 defs.extend(extract_conf_policy_defs(repo, client, path))
                 refs.extend(extract_loon_rules(repo, path))
@@ -1001,7 +944,6 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
     orphan_providers = audit_orphan_providers(providers, refs)
     type_violations = audit_provider_types(providers, refs)
     cn_violations = audit_cn_guards(refs)
-    sync_violations = audit_generated_sync(refs)
 
     if filter_set:
         defs = [item for item in defs if item.name.casefold() in filter_set]
@@ -1029,7 +971,6 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
         "orphan_rule_providers": [asdict(item) for item in orphan_providers],
         "provider_type_violations": [asdict(item) for item in type_violations],
         "cn_guard_violations": [asdict(item) for item in cn_violations],
-        "generated_sync_violations": [asdict(item) for item in sync_violations],
     }
 
 
@@ -1055,7 +996,6 @@ def print_report(payload: dict[str, object]) -> None:
     print_items(payload, "orphan_rule_providers", "Orphan rule providers")
     print_items(payload, "provider_type_violations", "Provider type violations")
     print_items(payload, "cn_guard_violations", "CN guard violations")
-    print_items(payload, "generated_sync_violations", "Generated Full/Split drift")
     print(
         "Inventory: "
         f"{len(payload['policy_definitions'])} policies, "
@@ -1071,11 +1011,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("repo", type=Path)
     parser.add_argument(
         "--policy", action="append", default=[], help="Policy filter; repeatable"
-    )
-    parser.add_argument(
-        "--require-generated-sync",
-        action="store_true",
-        help="Fail when Surge Full and generated Split Rule.dconf differ.",
     )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
@@ -1100,8 +1035,6 @@ def main(argv: list[str]) -> int:
         "provider_type_violations",
         "cn_guard_violations",
     ]
-    if args.require_generated_sync:
-        failures.append("generated_sync_violations")
     return 1 if any(payload[key] for key in failures) else 0
 
 

@@ -18,6 +18,17 @@ SPEC.loader.exec_module(audit)
 
 
 class RulePolicyAuditTests(unittest.TestCase):
+    def test_retired_client_directory_is_not_a_policy_consumer(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            path = repo / "Surge/AutoSurge.conf"
+            path.parent.mkdir()
+            path.write_text("[Rule]\nFINAL,RetiredGhost\n", encoding="utf-8")
+            payload = audit.audit(repo, [])
+            self.assertEqual(payload["rule_references"], [])
+            self.assertEqual(payload["undefined_rule_policies"], [])
+
+
     def test_loon_reads_only_active_rule_sections(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)

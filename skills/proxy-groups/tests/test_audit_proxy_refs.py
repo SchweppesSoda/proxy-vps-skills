@@ -45,13 +45,7 @@ class AuditProxyRefsTests(unittest.TestCase):
     type: select
 """
             write_config(root, "Mihomo/Auto.yaml", yaml)
-            write_config(
-                root,
-                "Surge/Auto.conf",
-                """[Proxy Group]
-核心-JP=select, DIRECT
-""",
-            )
+            write_config(root, "Surge/Auto.conf", "[Proxy Group]\nretired=select,DIRECT\n")
             write_config(
                 root,
                 "Egern/Auto.yaml",
@@ -84,7 +78,7 @@ proxy-groups:
             self.assertEqual(code, 0, error)
             self.assertEqual(error, "")
             self.assertEqual(AUDIT.normalize("🇯🇵 核心-JP_二"), "核心jp二")
-            for client in ("Mihomo", "Surge", "Egern", "Stash", "Loon"):
+            for client in ("Mihomo", "Egern", "Stash", "Loon"):
                 self.assertIn(client, text)
             portable_text = text.replace("\\", "/")
             self.assertIn("Stash/AutoStash.yaml", portable_text)
@@ -95,7 +89,7 @@ proxy-groups:
             self.assertEqual(code, 0, error)
             payload = json.loads(output)
             scanned = payload["scanned_files"]
-            self.assertEqual(len(scanned), 5)
+            self.assertEqual(len(scanned), 4)
             self.assertTrue(any(path.startswith("Stash") for path in scanned))
             self.assertTrue(any(path.startswith("Loon") for path in scanned))
             self.assertIn("核心jp", AUDIT.normalize("核心 JP"))

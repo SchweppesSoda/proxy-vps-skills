@@ -28,7 +28,6 @@ BUILT_INS = {
 CLIENT_EXTENSIONS = {
     "Egern": {".yaml", ".yml"},
     "Mihomo": {".yaml", ".yml"},
-    "Surge": {".conf", ".dconf"},
     "Loon": {".conf"},
     "Stash": {".yaml", ".yml"},
 }

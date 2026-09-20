@@ -27,7 +27,6 @@ hygiene; this reference remains authoritative for rule semantics and order.
 - Mihomo Mobile/OpenWrt/Safe: `rules` consume names from `rule-providers`; service groups live under `proxy-groups`.
 - Stash: Mihomo-style `rules`, `rule-providers`, and `proxy-groups`, with Stash-specific providers where required.
 - Egern: `rules` contain `match` plus `policy`; service groups live under `policy_groups`.
-- Surge Full: `[Rule]` lines map rule-set URLs to policies; service groups live in `[Proxy Group]`. Split files are generated from Full.
 - Loon Full/Lite: `[Remote Rule]` entries map URLs to policies. Lite may deliberately map dedicated services to `Proxy`.
 
 ## Canonical Full Order
@@ -102,7 +101,7 @@ comments, and references are stale.
 
 - Mihomo/Stash consume CustomRules domain and IP MRS artifacts with matching
   `domain` and `ipcidr` behavior.
-- Surge/Egern/Loon consume the corresponding LIST artifacts.
+- Egern/Loon consume the corresponding LIST artifacts.
 - `Mihomo/IP/<Service>.*` and `Surge/IP/<Service>.list` are IP-only; a domain
   provider may never point at those paths.
 - Emby has one public automatic set: reviewed manual Emby union V2Fly

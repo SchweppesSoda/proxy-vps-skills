@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Dependency-free, read-only DNS audit for the five ProxyConfig clients.
 
-Profiles are discovered dynamically.  Derived Surge split and Mihomo WAN2
+Profiles are discovered dynamically.  Derived Mihomo WAN2
 files remain visible in generated/skipped ranges but are not treated as a
 second source of truth when their canonical source is present.
 """
@@ -179,8 +179,6 @@ def _candidate_files(repo: Path, directory: str, recursive: bool) -> list[Path]:
 def classify_profile(repo: Path, path: Path, client: str) -> Profile:
     relative = rel(path, repo).casefold()
     markers = marker_ranges(read_lines(path))
-    if client == "Surge" and "split conf" in relative:
-        return Profile(client, path, "generated", "whole-file", "Surge/AutoSurge.conf", markers)
     if client == "Mihomo" and "wan2" in path.name.casefold():
         return Profile(client, path, "generated", "whole-file", "Mihomo/AutoMihomo.OpenWrt.yaml", markers)
     if markers:
@@ -189,7 +187,7 @@ def classify_profile(repo: Path, path: Path, client: str) -> Profile:
 
 
 def discover_profiles(repo: Path) -> list[Profile]:
-    roots = (("Egern", "Egern", True), ("Mihomo", "Mihomo", True), ("Surge", "Surge", True), ("Loon", "Loon", True), ("Stash", "Stash", True))
+    roots = (("Egern", "Egern", True), ("Mihomo", "Mihomo", True), ("Loon", "Loon", True), ("Stash", "Stash", True))
     profiles = [classify_profile(repo, path, client) for client, directory, recursive in roots for path in _candidate_files(repo, directory, recursive)]
     return sorted(profiles, key=lambda item: rel(item.path, repo).casefold())
 
@@ -330,10 +328,6 @@ def _ini_host(path: Path, repo: Path, filters: set[str], client: str) -> list[Hi
             if wanted(key, filters):
                 result.append(Hit(rel(path, repo), index, f"{client.casefold()}-host", key, value, _safe_line(line), client))
     return result
-
-
-def extract_surge_host(path: Path, repo: Path, filters: set[str]) -> list[Hit]:
-    return _ini_host(path, repo, filters, "Surge")
 
 
 def extract_loon_host(path: Path, repo: Path, filters: set[str]) -> list[Hit]:
@@ -600,8 +594,6 @@ def _scan_profile(profile: Profile, repo: Path, filters: set[str]) -> list[Hit]:
         return extract_mihomo_policy(profile.path, repo, filters) + extract_yaml_hosts(profile.path, repo, filters, "Mihomo")
     if profile.client == "Stash":
         return extract_stash_policy(profile.path, repo, filters) + extract_yaml_hosts(profile.path, repo, filters, "Stash")
-    if profile.client == "Surge":
-        return extract_surge_host(profile.path, repo, filters) + extract_ini_dns_settings(profile.path, repo, "Surge", filters)
     if profile.client == "Loon":
         return extract_loon_host(profile.path, repo, filters) + extract_ini_dns_settings(profile.path, repo, "Loon", filters)
     return []

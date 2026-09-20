@@ -5,9 +5,6 @@
 - Mihomo profiles are discovered under `Mihomo/`; the active canonical inputs
   include `AutoMihomo.Mobile.yaml` and `AutoMihomo.OpenWrt.yaml`, while
   `SafeMihomo.yaml` may intentionally be minimal.
-- Surge's canonical full profile is `Surge/AutoSurge.conf`.
-  `Surge/Split Conf/AutoSurge/` is generated output and is not a second source
-  of truth.
 - Stash, Loon, and Egern each have their own provider and policy shapes. Do
   not infer parity from a matching display name.
 
@@ -27,9 +24,6 @@ merged.
 
 - Mihomo: `proxy-providers` define sources; `proxy-groups` consume provider
   names or other groups. Mobile, OpenWrt, and Safe can intentionally differ.
-- Surge Full: `[Proxy Group]` contains providers and policy groups;
-  `include-other-group` is the main aggregation mechanism. Split sections are
-  generated from the full profile.
 - Stash: Mihomo-like provider/group structures with Stash-specific overrides
   and rule consumers.
 - Egern: `policy_groups` and `external` provider pools use Egern-specific

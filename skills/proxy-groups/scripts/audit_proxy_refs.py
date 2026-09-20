@@ -2,8 +2,8 @@
 """Audit proxy group definitions and references in ProxyConfig.
 
 The script is intentionally dependency-free. It does not validate full YAML or
-Surge syntax; it finds definitions and occurrences so an agent can reason about
-the edit surface before touching Mihomo, Surge, Egern, Stash, or Loon files.
+Loon INI syntax; it finds definitions and occurrences so an agent can reason about
+the edit surface before touching Mihomo, Egern, Stash, or Loon files.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 
 
 CONFIG_SUFFIXES = {".yaml", ".yml", ".conf", ".dconf", ".json"}
-DEFAULT_DIRS = ("Mihomo", "Surge", "Egern", "Stash", "Loon")
+DEFAULT_DIRS = ("Mihomo", "Egern", "Stash", "Loon")
 DEFINITION_WINDOW = 12
 
 # Audit reports are frequently copied into issue trackers and agent logs.
@@ -233,10 +233,10 @@ def extract_definitions(path: Path, repo: Path) -> list[Definition]:
         if not stripped or stripped.startswith("#"):
             continue
 
-        surge = re.match(r"^([^=\[\]#][^=]*?)\s*=\s*([^,\s]+)", line)
-        if surge and path.suffix.lower() in {".conf", ".dconf"}:
-            name = surge.group(1).strip()
-            kind = surge.group(2).strip()
+        ini = re.match(r"^([^=\[\]#][^=]*?)\s*=\s*([^,\s]+)", line)
+        if ini and path.suffix.lower() in {".conf", ".dconf"}:
+            name = ini.group(1).strip()
+            kind = ini.group(2).strip()
             defs.append(Definition(name=name, file=rel, line=idx + 1, kind=kind, text=stripped))
             continue
 
