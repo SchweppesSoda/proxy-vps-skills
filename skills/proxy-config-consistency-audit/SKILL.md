@@ -19,3 +19,5 @@ The global script covers inventory, visible targets and writer structure. It doe
 ## Completion
 
 Report actionable findings with file/line evidence, scope checked, intentional asymmetry, skipped checks and downstream build status. Do not turn a missing client feature into mandatory parity. Run only documented side-effect-free checks; never execute index validator strings, network fetches, generators or publishers as part of this read-only audit. Distinguish tool/environment failures from configuration defects and mask credentials/capability values. Stop when the requested coverage is assessed; do not repeat successful checks or silently expand into repairs.
+
+The audit reports `checked`, `skipped`, and `missing` profile inventories. Missing required canonical profiles (including independent Egern Lite) mean incomplete coverage and exit code 2; they are never a pass. `checked` only means this script's documented checks ran, not client/runtime validation. Generated derivatives and retired Loon Lite are not canonical parity targets. Do not install source skill changes unless the current task authorizes installation.

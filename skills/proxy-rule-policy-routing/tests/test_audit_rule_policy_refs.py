@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import importlib.util
 import sys
 import tempfile
@@ -18,6 +20,32 @@ SPEC.loader.exec_module(audit)
 
 
 class RulePolicyAuditTests(unittest.TestCase):
+    def test_egern_lite_unknown_policy_is_checked_and_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            path = repo / "Egern/AutoEgernLite.yaml"
+            path.parent.mkdir()
+            path.write_text("rules:\n  - domain:\n      match: fixture.invalid\n      policy: LiteGhost\n", encoding="utf-8")
+            payload = audit.audit(repo, [])
+            self.assertEqual([item["path"] for item in payload["checked"]], ["Egern/AutoEgernLite.yaml"])
+            self.assertEqual([item["policy"] for item in payload["undefined_rule_policies"]], ["LiteGhost"])
+            self.assertEqual(payload["undefined_rule_policies"][0]["file"], "Egern/AutoEgernLite.yaml")
+
+    def test_missing_profiles_do_not_pass_and_retired_lite_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            path = repo / "Loon/AutoLoonLite.conf"
+            path.parent.mkdir()
+            path.write_text("[Rule]\nFINAL,RetiredGhost\n", encoding="utf-8")
+            payload = audit.audit(repo, [])
+            self.assertEqual(payload["checked"], [])
+            self.assertEqual(payload["rule_references"], [])
+            self.assertEqual(len(payload["missing"]), 7)
+            self.assertIn({"client": "Loon", "path": "Loon/AutoLoonLite.conf", "reason": "retired-profile"}, payload["skipped"])
+            self.assertIn("Egern/AutoEgernLite.yaml", {item["path"] for item in payload["missing"]})
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(audit.main([str(repo), "--json"]), 2)
+
     def test_retired_client_directory_is_not_a_policy_consumer(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)

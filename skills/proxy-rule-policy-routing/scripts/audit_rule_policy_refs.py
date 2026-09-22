@@ -14,14 +14,14 @@ from urllib.parse import unquote, urlsplit
 
 BUILT_INS = {"DIRECT", "REJECT", "REJECT-DROP", "REJECT-TINYGIF", "FINAL"}
 CLIENT_FILES = {
-    "Egern": ("Egern/AutoEgern.yaml",),
+    "Egern": ("Egern/AutoEgern.yaml", "Egern/AutoEgernLite.yaml"),
     "Mihomo": (
         "Mihomo/AutoMihomo.Mobile.yaml",
         "Mihomo/AutoMihomo.OpenWrt.yaml",
         "Mihomo/SafeMihomo.yaml",
     ),
     "Stash": ("Stash/AutoStash.yaml",),
-    "Loon": ("Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf"),
+    "Loon": ("Loon/AutoLoon.conf",),
 }
 FULL_ORDER_FILES = {
     "Egern/AutoEgern.yaml": "Egern",
@@ -33,11 +33,11 @@ FULL_ORDER_FILES = {
 ORDER_FILES = {
     **FULL_ORDER_FILES,
     "Mihomo/SafeMihomo.yaml": "Mihomo",
-    "Loon/AutoLoonLite.conf": "Loon",
+    "Egern/AutoEgernLite.yaml": "Egern",
 }
 FINANCE_ORDER_FILES = {
     **FULL_ORDER_FILES,
-    "Loon/AutoLoonLite.conf": "Loon",
+    "Egern/AutoEgernLite.yaml": "Egern",
 }
 FINANCE_SEQUENCE = ("PayPal", "Banking", "Crypto")
 APPLE_SEQUENCE = ("ApplePushDomain", "AppleMedia", "AppleCN", "Apple")
@@ -909,11 +909,24 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
     defs: list[PolicyDef] = []
     refs: list[RuleRef] = []
     providers: list[ProviderDef] = []
+    checked: list[dict[str, str]] = []
+    missing: list[dict[str, str]] = []
+    skipped: list[dict[str, str]] = []
     for client, names in CLIENT_FILES.items():
+        root = repo / client
+        if root.is_dir():
+            for candidate in sorted(root.iterdir()):
+                if candidate.is_file() and candidate.suffix.casefold() in {".yaml", ".yml", ".conf"}:
+                    relative = candidate.relative_to(repo).as_posix()
+                    if relative not in names:
+                        reason = "retired-profile" if relative == "Loon/AutoLoonLite.conf" else "outside-canonical-rule-inventory; verify with owner"
+                        skipped.append({"client": client, "path": relative, "reason": reason})
         for name in names:
             path = repo / name
-            if not path.exists():
+            if not path.is_file():
+                missing.append({"client": client, "path": name, "reason": "required canonical profile absent"})
                 continue
+            checked.append({"client": client, "path": name, "checks": "rule targets, providers and applicable order"})
             if client == "Egern":
                 defs.extend(extract_yaml_policy_defs(repo, client, path))
                 refs.extend(extract_egern_rules(repo, path))
@@ -962,6 +975,9 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
 
     return {
         "repo": str(repo),
+        "checked": checked,
+        "skipped": skipped,
+        "missing": missing,
         "policy_definitions": [asdict(item) for item in defs],
         "rule_references": [asdict(item) for item in refs],
         "rule_providers": [asdict(item) for item in providers],
@@ -989,6 +1005,10 @@ def print_items(payload: dict[str, object], key: str, title: str) -> None:
 
 def print_report(payload: dict[str, object]) -> None:
     print(f"Repo: {payload['repo']}")
+    for status in ("checked", "skipped", "missing"):
+        print(f"{status}: {len(payload[status])}")
+        for item in payload[status]:
+            print(f"  {item['path']} ({item.get('reason', item.get('checks', ''))})")
     print()
     print_items(payload, "undefined_rule_policies", "Undefined rule policies")
     print_items(payload, "finance_order_violations", "Finance order violations")
@@ -1035,6 +1055,8 @@ def main(argv: list[str]) -> int:
         "provider_type_violations",
         "cn_guard_violations",
     ]
+    if payload["missing"]:
+        return 2
     return 1 if any(payload[key] for key in failures) else 0
 
 

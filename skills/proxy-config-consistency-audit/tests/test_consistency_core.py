@@ -100,6 +100,9 @@ rules:
 """
         for path in (
             repo / "Egern/AutoEgern.yaml",
+            repo / "Egern/AutoEgernLite.yaml",
+            repo / "Mihomo/AutoMihomo.OpenWrt.yaml",
+            repo / "Mihomo/SafeMihomo.yaml",
             repo / "Mihomo/AutoMihomo.Mobile.yaml",
             repo / "Stash/AutoStash.yaml",
         ):
@@ -168,7 +171,7 @@ token: https://example.invalid/sub?token=top-secret
         )
         return repo
 
-    def test_clean_fixture_discovers_five_clients_and_skips_whole_file(self) -> None:
+    def test_clean_fixture_discovers_four_clients_and_skips_whole_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = self.make_repo(Path(temp))
             payload = audit.audit(repo, [])
@@ -177,6 +180,21 @@ token: https://example.invalid/sub?token=top-secret
             self.assertEqual({item["client"] for item in payload["scanned"]}, {"Egern", "Mihomo", "Loon", "Stash"})
             self.assertIn("Mihomo/Generated.yaml", {item["path"] for item in payload["skipped"]})
             self.assertEqual(payload["summary"]["generated"], 2)
+            self.assertEqual(payload["checked"], payload["scanned"])
+            self.assertEqual(payload["missing"], [])
+            self.assertIn("Egern/AutoEgernLite.yaml", {item["path"] for item in payload["checked"]})
+
+    def test_missing_lite_is_incomplete_even_when_retired_lite_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            (repo / "Egern/AutoEgernLite.yaml").unlink()
+            (repo / "Loon/AutoLoonLite.conf").write_text("[Proxy Group]\nGhost = select,DIRECT\n", encoding="utf-8")
+            payload = audit.audit(repo, [])
+            self.assertEqual([item["path"] for item in payload["missing"]], ["Egern/AutoEgernLite.yaml"])
+            self.assertIn("missing-canonical-profile", {item["kind"] for item in payload["environment_errors"]})
+            self.assertIn({"client": "Loon", "path": "Loon/AutoLoonLite.conf", "reason": "retired-profile"}, payload["skipped"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(audit.main([str(repo), "--json"]), 2)
 
     def test_contract_overlap_is_a_configuration_issue(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -217,7 +235,9 @@ token: https://example.invalid/sub?token=top-secret
             repo = Path(temp) / "ProxyConfig"
             repo.mkdir()
             payload = audit.audit(repo, [])
-            self.assertEqual(payload["summary"]["environment_errors"], 1)
+            self.assertEqual(payload["summary"]["environment_errors"], 8)
+            self.assertEqual(len(payload["missing"]), 7)
+            self.assertEqual(len([item for item in payload["environment_errors"] if item["kind"] != "missing-canonical-profile"]), 1)
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(audit.main([str(repo), "--json"]), 2)
 
@@ -228,7 +248,9 @@ token: https://example.invalid/sub?token=top-secret
             contract.parent.mkdir(parents=True)
             contract.write_bytes(b"\xff\xfe\x00")
             payload = audit.audit(repo, [])
-            self.assertEqual(payload["summary"]["environment_errors"], 1)
+            self.assertEqual(payload["summary"]["environment_errors"], 8)
+            self.assertEqual(len(payload["missing"]), 7)
+            self.assertEqual(len([item for item in payload["environment_errors"] if item["kind"] != "missing-canonical-profile"]), 1)
 
     def test_json_output_redacts_urls_tokens_and_uuids(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

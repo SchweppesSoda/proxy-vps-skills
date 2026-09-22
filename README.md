@@ -12,7 +12,7 @@
 | `proxy-groups` | 维护代理组、provider source、Sub-Store collection、节点前缀和消费者引用。 | 普通 provider/group 身份、成员和 source 变更；跨 generated writer 时联合 `proxy-generated-config-sync`。 |
 | `proxy-dns-routing` | 维护 AirportServers、机场节点域名、DoH、DNS upstream、Host 映射和实际 DNS 解析。 | 普通 DNS 语义和人工投影；涉及 Airport DNS/Provider Compatibility writer 时联合 generated skill。 |
 | `proxy-rule-policy-routing` | 维护 rule-provider、规则顺序和 rule-to-policy 映射。 | 普通规则与策略语义；涉及 CustomRules build、marker 或派生文件时联合 generated skill。 |
-| `proxy-config-consistency-audit` | 只读编排五客户端、规则、DNS、provider 和 generated writer 一致性。 | 用户要求的审计或跨领域漂移；不作为每次修改的前后置门禁。 |
+| `proxy-config-consistency-audit` | 只读检查四类客户端的 inventory、provider/group 与 generated writer 结构；领域语义由对应审计补充。 | 用户要求的审计或跨领域漂移；不作为每次修改的前后置门禁。 |
 | `proxy-generated-config-sync` | 维护 generated writer ownership、marker/field/whole-file scope、锁、事务和跨仓发布边界。 | 仅用于 Airport DNS、Provider Compatibility、OpenWrt→WAN2、CustomRules 发布及 writer 合同。 |
 
 ## 安装
@@ -44,6 +44,8 @@ npx skills add SchweppesSoda/proxy-vps-skills --skill proxy-generated-config-syn
 ```text
 Egern/AutoEgern.yaml                   canonical combined profile
     └─ Egern/AutoEgern.PO0{SH,GZ}.yaml generated PO0 profiles
+
+Egern/AutoEgernLite.yaml                independent canonical Lite profile
 
 Mihomo/AutoMihomo.OpenWrt.yaml           canonical OpenWrt baseline
     └─ Mihomo/AutoMihomo.OpenWrt-WAN2.yaml generated whole-file derivative

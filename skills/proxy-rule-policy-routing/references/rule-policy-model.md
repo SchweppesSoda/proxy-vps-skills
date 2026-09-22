@@ -26,8 +26,8 @@ hygiene; this reference remains authoritative for rule semantics and order.
 
 - Mihomo Mobile/OpenWrt/Safe: `rules` consume names from `rule-providers`; service groups live under `proxy-groups`.
 - Stash: Mihomo-style `rules`, `rule-providers`, and `proxy-groups`, with Stash-specific providers where required.
-- Egern: `rules` contain `match` plus `policy`; service groups live under `policy_groups`.
-- Loon Full/Lite: `[Remote Rule]` entries map URLs to policies. Lite may deliberately map dedicated services to `Proxy`.
+- Egern Full/Lite: independent canonical profiles; `rules` contain `match` plus `policy`, and service groups live under `policy_groups`. Lite may deliberately map dedicated services to `Proxy`.
+- Loon Full: `[Remote Rule]` entries map URLs to policies. Loon Lite is retired and is not a current policy consumer.
 
 ## Canonical Full Order
 

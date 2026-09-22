@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free, read-only DNS audit for the five ProxyConfig clients.
+"""Dependency-free, read-only DNS audit for the four ProxyConfig client families.
 
 Profiles are discovered dynamically.  Derived Mihomo WAN2
 files remain visible in generated/skipped ranges but are not treated as a

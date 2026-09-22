@@ -437,6 +437,17 @@ def validate_contract(repo: Path, contract: dict[str, Any]) -> tuple[list[Findin
     return issues, sorted(generated, key=lambda item: (item["repository"], item["path"], item["writer"])), sorted(set(whole_file_patterns))
 
 
+EXPECTED_CANONICAL_PROFILES = {
+    "Egern/AutoEgern.yaml": "Egern",
+    "Egern/AutoEgernLite.yaml": "Egern",
+    "Mihomo/AutoMihomo.Mobile.yaml": "Mihomo",
+    "Mihomo/AutoMihomo.OpenWrt.yaml": "Mihomo",
+    "Mihomo/SafeMihomo.yaml": "Mihomo",
+    "Loon/AutoLoon.conf": "Loon",
+    "Stash/AutoStash.yaml": "Stash",
+}
+
+
 def discover_client_files(repo: Path, whole_file_patterns: list[str]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     scanned: list[dict[str, str]] = []
     skipped: list[dict[str, str]] = []
@@ -446,6 +457,9 @@ def discover_client_files(repo: Path, whole_file_patterns: list[str]) -> tuple[l
             continue
         for path in sorted(item for item in root.rglob("*") if item.is_file() and item.suffix.casefold() in extensions):
             relative = relative_path(path, repo)
+            if relative == "Loon/AutoLoonLite.conf":
+                skipped.append({"client": client, "path": relative, "reason": "retired-profile"})
+                continue
             matching = next((pattern for pattern in whole_file_patterns if pattern_matches(relative, pattern)), None)
             if matching:
                 skipped.append({"client": client, "path": relative, "reason": "whole-file-generated"})
@@ -643,6 +657,15 @@ def audit(repo: Path, raw_targets: list[str], contract_path: Path | None = None)
     if contract is not None:
         contract_issues, generated, whole_file_patterns = validate_contract(repo, contract)
     scanned, skipped = discover_client_files(repo, whole_file_patterns)
+    missing = [
+        {"client": client, "path": path, "reason": "required canonical profile absent"}
+        for path, client in EXPECTED_CANONICAL_PROFILES.items()
+        if not (repo / path).is_file()
+    ]
+    environment_errors.extend(
+        Finding("error", "missing-canonical-profile", item["path"], "coverage incomplete; configuration not checked")
+        for item in missing
+    )
     providers, region_groups, client_issues = inspect_clients(repo, scanned, raw_targets)
     issues = contract_issues + client_issues
     payload: dict[str, Any] = {
@@ -653,7 +676,9 @@ def audit(repo: Path, raw_targets: list[str], contract_path: Path | None = None)
             "writers": len(contract.get("writers", [])) if contract else 0,
         },
         "scanned": scanned,
+        "checked": scanned,
         "skipped": skipped,
+        "missing": missing,
         "generated": generated,
         "providers": providers,
         "region_groups": region_groups,
@@ -661,7 +686,9 @@ def audit(repo: Path, raw_targets: list[str], contract_path: Path | None = None)
         "environment_errors": [asdict(item) for item in environment_errors],
         "summary": {
             "scanned": len(scanned),
+            "checked": len(scanned),
             "skipped": len(skipped),
+            "missing": len(missing),
             "generated": len(generated),
             "issues": len(issues),
             "environment_errors": len(environment_errors),
@@ -676,8 +703,11 @@ def print_report(payload: dict[str, Any]) -> None:
     print(f"Contract: {payload['contract']['path']} ({payload['contract']['writers']} writers)")
     print(
         "Files: "
-        f"scanned={summary['scanned']} skipped={summary['skipped']} generated={summary['generated']}"
+        f"checked={summary['checked']} skipped={summary['skipped']} missing={summary['missing']} generated={summary['generated']}"
     )
+    for status in ("checked", "skipped", "missing"):
+        for item in payload[status]:
+            print(f"  [{status}] {item['path']} ({item.get('reason', 'visible provider/group and writer structure only')})")
     print(f"Findings: issues={summary['issues']} environment_errors={summary['environment_errors']}")
     for item in payload["environment_errors"]:
         print(f"  [environment] {item['kind']} {item['subject']}: {item['detail']}")
