@@ -28,8 +28,9 @@ merged.
   and rule consumers.
 - Egern: `policy_groups` and `external` provider pools use Egern-specific
   filters and `auto_test`/`fallback` semantics.
-- Loon: provider and policy sections plus Full/Lite rule consumers can be
-  intentionally less symmetric than other clients.
+- Loon Full: provider and policy sections can intentionally differ from
+  other clients. Loon Lite is retired and is not a maintained group or rule
+  consumer; do not recreate its configuration when synchronizing groups.
 
 ## Operation checklist
 
