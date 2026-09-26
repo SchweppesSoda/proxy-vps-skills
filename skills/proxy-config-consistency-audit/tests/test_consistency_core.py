@@ -185,6 +185,73 @@ token: https://example.invalid/sub?token=top-secret
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(audit.main([str(repo), "--json"]), 0)
 
+    def add_po0_groups(self, repo: Path) -> None:
+        groups = "".join(f"  - name: PO0-{region}\n" for region in ("HK", "TW", "JP", "US"))
+        for relative in audit.EXPECTED_CANONICAL_PROFILES:
+            path = repo / relative
+            path.write_text(path.read_text(encoding="utf-8").replace("  - name: Service", groups + "  - name: Service"), encoding="utf-8")
+
+    def test_po0_four_regions_pass_alongside_five_region_airport(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.add_po0_groups(repo)
+            for targets in ([], ["PO0"]):
+                with self.subTest(targets=targets):
+                    payload = audit.audit(repo, targets)
+                    self.assertEqual(payload["environment_errors"], [])
+                    self.assertEqual(payload["issues"], [])
+                    self.assertEqual(set(payload["region_groups"]["PO0"]), {"Egern", "Mihomo", "Stash"})
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        args = [str(repo), "--json"] + [arg for target in targets for arg in ("--target", target)]
+                        self.assertEqual(audit.main(args), 0)
+
+    def test_po0_each_required_region_missing_fails_for_each_active_client(self) -> None:
+        for client in ("Egern", "Mihomo", "Stash"):
+            for missing_region in ("HK", "TW", "JP", "US"):
+                with self.subTest(client=client, missing_region=missing_region), tempfile.TemporaryDirectory() as temp:
+                    repo = self.make_repo(Path(temp))
+                    self.add_po0_groups(repo)
+                    for relative, profile_client in audit.EXPECTED_CANONICAL_PROFILES.items():
+                        if profile_client == client:
+                            path = repo / relative
+                            path.write_text(path.read_text(encoding="utf-8").replace(f"  - name: PO0-{missing_region}\n", ""), encoding="utf-8")
+                    payload = audit.audit(repo, ["PO0"])
+                    self.assertEqual(payload["environment_errors"], [])
+                    self.assertEqual(len(payload["issues"]), 1)
+                    issue = payload["issues"][0]
+                    self.assertEqual((issue["kind"], issue["subject"]), ("region-coverage", f"{client}:PO0"))
+                    self.assertIn(f"missing ['{missing_region}']", issue["detail"])
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(audit.main([str(repo), "--target", "PO0", "--json"]), 1)
+
+    def test_airport_still_requires_all_five_regions(self) -> None:
+        for missing_region in ("HK", "TW", "SG", "JP", "US"):
+            with self.subTest(missing_region=missing_region), tempfile.TemporaryDirectory() as temp:
+                repo = self.make_repo(Path(temp))
+                self.add_po0_groups(repo)
+                path = repo / "Stash/AutoStash.yaml"
+                path.write_text(path.read_text(encoding="utf-8").replace(f"  - name: TAG-{missing_region}\n", ""), encoding="utf-8")
+                payload = audit.audit(repo, [])
+                self.assertEqual(len(payload["issues"]), 1)
+                issue = payload["issues"][0]
+                self.assertEqual((issue["kind"], issue["subject"]), ("region-coverage", "Stash:TAG"))
+                self.assertIn(f"missing ['{missing_region}']", issue["detail"])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(audit.main([str(repo), "--json"]), 1)
+
+    def test_po0_unexpected_region_is_not_silently_exempted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = self.make_repo(Path(temp))
+            self.add_po0_groups(repo)
+            path = repo / "Stash/AutoStash.yaml"
+            path.write_text(path.read_text(encoding="utf-8").replace("  - name: Service", "  - name: PO0-SG\n  - name: Service"), encoding="utf-8")
+            payload = audit.audit(repo, ["PO0"])
+            self.assertEqual(len(payload["issues"]), 1)
+            self.assertEqual(payload["issues"][0]["subject"], "Stash:PO0")
+            self.assertIn("unexpected ['SG']", payload["issues"][0]["detail"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(audit.main([str(repo), "--target", "PO0", "--json"]), 1)
+
     def test_leftover_loon_profiles_never_enter_active_discovery(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = self.make_repo(Path(temp))

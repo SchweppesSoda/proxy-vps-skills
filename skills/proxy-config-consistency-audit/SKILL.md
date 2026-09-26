@@ -16,6 +16,8 @@ This workflow inspects and reports; it does not authorize repair. If the user al
 
 The global script covers inventory, visible targets and writer structure. It does not run all deeper audits or generators. `--target <name>` focuses the report; shared checks can still run. Add a domain audit only to resolve a concrete finding or meet the requested coverage.
 
+Region coverage requires HK/TW/JP/US for the exact `PO0` base and HK/TW/SG/JP/US for other airport bases. PO0 is not exempt from missing-region checks.
+
 ## Completion
 
 Report actionable findings with file/line evidence, scope checked, intentional asymmetry, skipped checks and downstream build status. Do not turn a missing client feature into mandatory parity. Run only documented side-effect-free checks; never execute index validator strings, network fetches, generators or publishers as part of this read-only audit. Distinguish tool/environment failures from configuration defects and mask credentials/capability values. Stop when the requested coverage is assessed; do not repeat successful checks or silently expand into repairs.

@@ -4,8 +4,10 @@
 
 - A provider/source or published artifact is missing from a client where parity
   is expected, or a consumer points at a stale identity.
-- An airport-like region base has incomplete HK/TW/SG/JP/US coverage where the
-  client contract requires those regions.
+- An airport-like region base has incomplete HK/TW/SG/JP/US coverage. The exact
+  `PO0` base instead requires HK/TW/JP/US: SG is not required. Missing any of
+  those four regions still fails; an unexpected PO0 region is also reported.
+  Residential, Relay-Res and Dialer-Res keep their partial-region exemption.
 - A removed provider remains in a group, aggregate, rule, DNS projection,
   comment, cache path, or generated output without an intentional-retention
   record.

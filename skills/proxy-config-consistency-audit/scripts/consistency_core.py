@@ -14,6 +14,7 @@ from typing import Any
 
 
 REGIONS = ("HK", "TW", "SG", "JP", "US")
+REGION_EXPECTATIONS = {"PO0": ("HK", "TW", "JP", "US")}
 PARTIAL_REGION_BASES = {"Residential", "Relay-Res", "Dialer-Res"}
 BUILT_INS = {
     "DIRECT",
@@ -612,10 +613,16 @@ def inspect_clients(repo: Path, scanned: list[dict[str, str]], raw_targets: list
     for base, by_client in sorted(region_groups.items()):
         if base in PARTIAL_REGION_BASES:
             continue
+        expected = set(REGION_EXPECTATIONS.get(base, REGIONS))
         for client, by_region in sorted(by_client.items()):
             present = set(by_region)
-            if present and present != set(REGIONS):
-                issues.append(Finding("warning", "region-coverage", f"{client}:{base}", f"has {sorted(present)}, missing {sorted(set(REGIONS) - present)}"))
+            missing = expected - present
+            unexpected = present - expected
+            if missing or unexpected:
+                detail = f"has {sorted(present)}, missing {sorted(missing)}"
+                if unexpected:
+                    detail += f", unexpected {sorted(unexpected)}"
+                issues.append(Finding("warning", "region-coverage", f"{client}:{base}", detail))
 
     if not targets:
         names_by_client: dict[str, set[str]] = {}
