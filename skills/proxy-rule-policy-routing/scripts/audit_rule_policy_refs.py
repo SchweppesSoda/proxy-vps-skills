@@ -21,14 +21,13 @@ CLIENT_FILES = {
         "Mihomo/SafeMihomo.yaml",
     ),
     "Stash": ("Stash/AutoStash.yaml",),
-    "Loon": ("Loon/AutoLoon.conf",),
 }
+RETIRED_PROFILES = ("Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf")
 FULL_ORDER_FILES = {
     "Egern/AutoEgern.yaml": "Egern",
     "Mihomo/AutoMihomo.Mobile.yaml": "Mihomo",
     "Mihomo/AutoMihomo.OpenWrt.yaml": "Mihomo",
     "Stash/AutoStash.yaml": "Stash",
-    "Loon/AutoLoon.conf": "Loon",
 }
 ORDER_FILES = {
     **FULL_ORDER_FILES,
@@ -911,7 +910,11 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
     providers: list[ProviderDef] = []
     checked: list[dict[str, str]] = []
     missing: list[dict[str, str]] = []
-    skipped: list[dict[str, str]] = []
+    skipped = [
+        {"client": "Loon", "path": relative, "reason": "retired-profile"}
+        for relative in RETIRED_PROFILES
+        if (repo / relative).is_file()
+    ]
     for client, names in CLIENT_FILES.items():
         root = repo / client
         if root.is_dir():
@@ -919,8 +922,7 @@ def audit(repo: Path, filters: list[str]) -> dict[str, object]:
                 if candidate.is_file() and candidate.suffix.casefold() in {".yaml", ".yml", ".conf"}:
                     relative = candidate.relative_to(repo).as_posix()
                     if relative not in names:
-                        reason = "retired-profile" if relative == "Loon/AutoLoonLite.conf" else "outside-canonical-rule-inventory; verify with owner"
-                        skipped.append({"client": client, "path": relative, "reason": reason})
+                        skipped.append({"client": client, "path": relative, "reason": "outside-canonical-rule-inventory; verify with owner"})
         for name in names:
             path = repo / name
             if not path.is_file():

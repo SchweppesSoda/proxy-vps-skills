@@ -20,6 +20,56 @@ SPEC.loader.exec_module(audit)
 
 
 class RulePolicyAuditTests(unittest.TestCase):
+    ACTIVE_PROFILES = (
+        "Egern/AutoEgern.yaml", "Egern/AutoEgernLite.yaml",
+        "Mihomo/AutoMihomo.Mobile.yaml", "Mihomo/AutoMihomo.OpenWrt.yaml",
+        "Mihomo/SafeMihomo.yaml", "Stash/AutoStash.yaml",
+    )
+
+    def make_repo(self, repo: Path) -> None:
+        for relative in self.ACTIVE_PROFILES:
+            path = repo / relative
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("rules: []\n", encoding="utf-8")
+
+    def test_six_canonical_profiles_complete_coverage_without_loon(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            self.make_repo(repo)
+            payload = audit.audit(repo, [])
+            self.assertEqual({item["path"] for item in payload["checked"]}, set(self.ACTIVE_PROFILES))
+            self.assertEqual(payload["missing"], [])
+            self.assertEqual(payload["skipped"], [])
+
+    def test_each_active_canonical_profile_remains_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            self.make_repo(repo)
+            for relative in self.ACTIVE_PROFILES:
+                with self.subTest(profile=relative):
+                    path = repo / relative
+                    original = path.read_bytes()
+                    path.unlink()
+                    payload = audit.audit(repo, [])
+                    self.assertEqual([item["path"] for item in payload["missing"]], [relative])
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(audit.main([str(repo), "--json"]), 2)
+                    path.write_bytes(original)
+
+    def test_leftover_loon_profiles_never_enter_active_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            self.make_repo(repo)
+            before = audit.audit(repo, [])
+            (repo / "Loon").mkdir()
+            for relative in ("Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf", "Loon/Extra.conf"):
+                (repo / relative).write_bytes(b"\xff")
+            after = audit.audit(repo, [])
+            self.assertEqual({item["path"] for item in after["skipped"]}, {"Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf"})
+            self.assertTrue(all(item["reason"] == "retired-profile" for item in after["skipped"]))
+            self.assertEqual({key: value for key, value in before.items() if key != "skipped"},
+                             {key: value for key, value in after.items() if key != "skipped"})
+
     def test_egern_lite_unknown_policy_is_checked_and_reported(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
@@ -40,7 +90,7 @@ class RulePolicyAuditTests(unittest.TestCase):
             payload = audit.audit(repo, [])
             self.assertEqual(payload["checked"], [])
             self.assertEqual(payload["rule_references"], [])
-            self.assertEqual(len(payload["missing"]), 7)
+            self.assertEqual(len(payload["missing"]), 6)
             self.assertIn({"client": "Loon", "path": "Loon/AutoLoonLite.conf", "reason": "retired-profile"}, payload["skipped"])
             self.assertIn("Egern/AutoEgernLite.yaml", {item["path"] for item in payload["missing"]})
             with contextlib.redirect_stdout(io.StringIO()):

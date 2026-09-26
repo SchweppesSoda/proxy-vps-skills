@@ -27,7 +27,7 @@ hygiene; this reference remains authoritative for rule semantics and order.
 - Mihomo Mobile/OpenWrt/Safe: `rules` consume names from `rule-providers`; service groups live under `proxy-groups`.
 - Stash: Mihomo-style `rules`, `rule-providers`, and `proxy-groups`, with Stash-specific providers where required.
 - Egern Full/Lite: independent canonical profiles; `rules` contain `match` plus `policy`, and service groups live under `policy_groups`. Lite may deliberately map dedicated services to `Proxy`.
-- Loon Full: `[Remote Rule]` entries map URLs to policies. Loon Lite is retired and is not a current policy consumer.
+- Loon Full/Lite are retired and excluded from active audits even when files remain. Historical parsers and tests retain `[Remote Rule]` support for explicit archive work.
 
 ## Canonical Full Order
 
@@ -83,7 +83,7 @@ Crypto
 
 This is a traffic precedence rule, not merely a policy-group display preference. It applies when the service exists in the client, including Lite profiles that map all three services to `Proxy`. Comments and blank lines are harmless; another active rule between these entries is a violation.
 
-For Loon, numeric tag prefixes are part of maintainability: after moving a block, renumber downstream tags so the displayed sequence matches the actual sequence.
+For explicitly requested historical Loon edits, numeric tag prefixes preserve the displayed sequence after moving a block.
 
 ## CN Guard Model
 
@@ -101,7 +101,7 @@ comments, and references are stale.
 
 - Mihomo/Stash consume CustomRules domain and IP MRS artifacts with matching
   `domain` and `ipcidr` behavior.
-- Egern/Loon consume the corresponding LIST artifacts.
+- Egern consumes the corresponding LIST artifacts; historical Loon parsing supports the same format.
 - `Mihomo/IP/<Service>.*` and `Surge/IP/<Service>.list` are IP-only; a domain
   provider may never point at those paths.
 - Emby has one public automatic set: reviewed manual Emby union V2Fly
@@ -110,7 +110,7 @@ comments, and references are stale.
   plugin declarations are not active rule references.
 
 Banking uses the existing Orz-3 `exchangerate.png` URL in clients that expose a
-service icon field: Stash `icon`, Egern `icon`, and Loon Full `img-url`.
+service icon field: Stash `icon` and Egern `icon` (historical Loon Full used `img-url`).
 
 ## Mihomo Kernel Validation Contract
 

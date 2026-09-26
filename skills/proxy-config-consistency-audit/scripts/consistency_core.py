@@ -28,7 +28,6 @@ BUILT_INS = {
 CLIENT_EXTENSIONS = {
     "Egern": {".yaml", ".yml"},
     "Mihomo": {".yaml", ".yml"},
-    "Loon": {".conf"},
     "Stash": {".yaml", ".yml"},
 }
 YAML_GROUP_SECTIONS = {"proxy-groups", "policy-groups", "policy_groups"}
@@ -443,23 +442,24 @@ EXPECTED_CANONICAL_PROFILES = {
     "Mihomo/AutoMihomo.Mobile.yaml": "Mihomo",
     "Mihomo/AutoMihomo.OpenWrt.yaml": "Mihomo",
     "Mihomo/SafeMihomo.yaml": "Mihomo",
-    "Loon/AutoLoon.conf": "Loon",
     "Stash/AutoStash.yaml": "Stash",
 }
+RETIRED_PROFILES = ("Loon/AutoLoon.conf", "Loon/AutoLoonLite.conf")
 
 
 def discover_client_files(repo: Path, whole_file_patterns: list[str]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     scanned: list[dict[str, str]] = []
-    skipped: list[dict[str, str]] = []
+    skipped = [
+        {"client": "Loon", "path": relative, "reason": "retired-profile"}
+        for relative in RETIRED_PROFILES
+        if (repo / relative).is_file()
+    ]
     for client, extensions in CLIENT_EXTENSIONS.items():
         root = repo / client
         if not root.is_dir():
             continue
         for path in sorted(item for item in root.rglob("*") if item.is_file() and item.suffix.casefold() in extensions):
             relative = relative_path(path, repo)
-            if relative == "Loon/AutoLoonLite.conf":
-                skipped.append({"client": client, "path": relative, "reason": "retired-profile"})
-                continue
             matching = next((pattern for pattern in whole_file_patterns if pattern_matches(relative, pattern)), None)
             if matching:
                 skipped.append({"client": client, "path": relative, "reason": "whole-file-generated"})
