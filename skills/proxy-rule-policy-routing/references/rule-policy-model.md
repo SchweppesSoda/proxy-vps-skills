@@ -39,7 +39,7 @@ order.
 1. Company intranet, SSID, LAN, private domain/IP, and client hard rules.
 2. `MyDirect`, then `MyProxy`.
 3. Ad blocking, HTTPDNS handling, then special direct rules.
-4. Global AI, then Apple Intelligence.
+4. Global AI non-address rules, then Apple Intelligence.
 5. `PayPal`, `Banking`, `Crypto`, active and contiguous.
 6. `Telegram`, `Discord`, `Twitter`, `TikTok`.
 7. `Emby`, `YouTube`, `Spotify`, `Netflix`, `Disney`.
@@ -52,28 +52,54 @@ order.
 12. Narrow domestic services: AI CN; Scholar CN; WeChat/NetEase/Tencent and
     similar reviewed service domains.
 13. Broad CN domains and domestic geographic domains.
-14. Service IP block: Apple Push; Telegram; Twitter; Google FCM; YouTube;
-    Netflix; Google; Proxy.
-15. CN IP, ASN, and GEOIP.
-16. `FINAL` routed to `Final`.
+14. Service address block, including Claude IP. Preserve the established
+    subsequence: Claude; Apple Push; Telegram; Twitter; Google FCM; YouTube;
+    Netflix; Google. Additional service CIDR/ASN partitions stay in this block;
+    their insertion is decided by reviewed overlap evidence and client regression
+    checks, without inventing a new universal service sequence.
+15. Broad proxy address rules, including `Address/Classical/Proxy`.
+16. Broad CN IP, ASN, and GEOIP, including `Address/Classical/China`.
+17. Exactly one final catch-all, last, routed to `Final`.
 
 Apple precedes regional TV so narrow Apple TV rules cannot be absorbed by a
 broad global-media list. Within regional TV, Asian TV precedes Global TV and
 CN Mainland TV remains the last media family.
 
-Domain rules identify a service more precisely than address ownership, so all
-service domains precede service IP rules. Service IP rules remain above broad
-CN IP/ASN/GEOIP rules: they supplement IP-literal or already-resolved traffic
-without allowing a broad domestic network rule to swallow a known service.
-Private/LAN/company IP rules are the deliberate exception at the top because
-they protect reachability and local-network safety.
+The non-address segment includes DOMAIN, DOMAIN-SUFFIX, DOMAIN-KEYWORD,
+DOMAIN-WILDCARD, USER-AGENT, PROCESS-NAME and URL-REGEX. Preserve their literal
+rules, relative order and targets in the owning business block; classical syntax
+does not make them address rules. All such business rules, even an unfamiliar
+service name or inline GEOSITE/domain rule, precede service addresses. IP-CIDR,
+IP-CIDR6 and IP-ASN belong to the address segment; ASN must not be represented as
+an ipcidr MRS. WeChat ASN is a service address, while broad China ASN is a CN tail.
 
-SafeMihomo keeps its existing minimal features. Its catch-all tail is: global
-domain, domestic domain, Proxy IP, China IP, Final.
+Address rules supplement IP-literal or already-resolved traffic. Service
+addresses remain above broad Proxy and CN address rules so those tails cannot
+swallow a known service. The early address exceptions are precise: maintained
+private/LAN/company rules; full-profile `Classical/Special` with only its existing
+`100.64.0.0/10` address member; and the two restored Stash HTTPDNS providers below.
+An arbitrary DIRECT CIDR, a name containing Private/Special, or another classical
+provider is not an exception. Private set members must remain local/reserved
+CIDRs, not public networks or ASNs. SafeMihomo's reviewed company `9.0.0.0/8`
+remains a client hard rule. Local AND conditions may use supported NETWORK,
+DST-PORT/SRC-PORT and target CIDR leaves only: at least one local/reserved target
+CIDR is required, every address condition must be local, and unknown, nested
+OR/NOT or public-address conditions never receive this exception.
+
+`Stash-HTTPDNS-Block` and `Stash-HTTPDNS-Loon-Extra` may retain their public CIDRs
+in the early HTTPDNS block only with policy `HTTPDNS` and their exact maintained
+source URLs. This is a restored HTTPDNS handling contract, not a general exemption
+for HTTPDNS-named providers. Actual snapshot contents still require validation;
+an unknown source or unsupported syntax cannot pass.
+
+SafeMihomo keeps its existing minimal features. Its tail is: global non-address,
+domestic non-address, any already-enabled service addresses, Proxy IP, China IP,
+Final. Applying this order does not add missing services to Safe or Lite.
 
 ## Finance Precedence Contract
 
-The active rule sequence immediately after the last AI rule must be:
+The active rule sequence immediately after the last AI non-address rule,
+including Apple Intelligence when present, must be:
 
 ```text
 PayPal
@@ -81,7 +107,7 @@ Banking
 Crypto
 ```
 
-This is a traffic precedence rule, not merely a policy-group display preference. It applies when the service exists in the client, including Lite profiles that map all three services to `Proxy`. Comments and blank lines are harmless; another active rule between these entries is a violation.
+This is a traffic precedence rule, not merely a policy-group display preference. It applies when the service exists in the client, including Lite profiles that map all three services to `Proxy`. Comments and blank lines are harmless; another active rule between these entries is a violation. Claude IP or another address rule targeting `AI Suite` belongs to the later address block and never resets the finance boundary.
 
 For explicitly requested historical Loon edits, numeric tag prefixes preserve the displayed sequence after moving a block.
 
@@ -101,9 +127,13 @@ comments, and references are stale.
 
 - Mihomo/Stash consume CustomRules domain and IP MRS artifacts with matching
   `domain` and `ipcidr` behavior.
-- Egern consumes the corresponding LIST artifacts; historical Loon parsing supports the same format.
+- Egern consumes the corresponding LIST artifacts; historical Loon parsing supports the same format. Mixed business sources use `Surge/NonIP/<original-source>.list` and `Surge/Address/<original-source>.list`, preserving the original `Classical/` or `Policy/Classical/` path. The non-address side stays at the original business position and target; the address side follows the segment contract above.
 - `Mihomo/IP/<Service>.*` and `Surge/IP/<Service>.list` are IP-only; a domain
   provider may never point at those paths.
+- Address partitions stay classical and preserve CIDR/ASN members. A NonIP
+  partition may additionally have a domain MRS only when its actual members are
+  exclusively DOMAIN/DOMAIN-SUFFIX. Directory names and manifest behavior do not
+  substitute for content validation.
 - Emby has one public automatic set: reviewed manual Emby union V2Fly
   `category-emby`. Clients must not stack a second Emby provider beside it.
 - Unused YAML rule providers are errors. Disabled/commented rules and Loon
@@ -111,6 +141,53 @@ comments, and references are stale.
 
 Banking uses the existing Orz-3 `exchangerate.png` URL in clients that expose a
 service icon field: Stash `icon` and Egern `icon` (historical Loon Full used `img-url`).
+
+## Content Validation Contract
+
+The audit has two explicit scopes. With no artifact input it checks references,
+provider declarations, canonical order and required final catch-alls; it does not
+prove the contents of a remote rule set. Use this mode for focused reference
+edits. For mixed-content migration or a domain/address acceptance gate, supply
+the verified local output from the matching CustomRules `auto-build` revision:
+
+```text
+python scripts/audit_rule_policy_refs.py <ProxyConfig-repo> --artifact-root <verified-output> --external-artifacts <HTTPDNS-snapshot-mapping.json> --json
+```
+
+Only the exact `auto-build`/`refs/heads/auto-build` generated URLs map to these
+local artifacts. A master, tag or other-ref URL is a source contract violation,
+even when its relative file happens to exist locally. The standalone restored
+HTTPDNS source under CustomRules `master/Stash/Rules/` is a separately bound
+external snapshot, not a generated-artifact consumer.
+
+Content mode expands active LIST rules and the same-set YAML accompanying each
+MRS, verifies manifest rule counts/hashes, and checks every member's actual type
+and early-address exception. YAML provider behavior must match the manifest's
+payload encoding, even if a classical payload happens to contain only domains;
+typed LIST/text inputs require classical behavior. MRS uses `mrs_behavior`.
+It retains address/non-address runs for order checks
+without embedding rule snapshots in the report. CustomRules `verify_build` and
+its pinned-kernel MRS loading/equivalence gate must run first; this audit does not
+decode the compiled MRS bytes itself. Reports identify this limit and record
+text hashes, counts and types.
+
+The external mapping is a local schema 1 JSON file. It contains `artifacts`, keyed
+by the exact maintained public URL, with `path` relative to the mapping directory,
+`format: "text"`, `behavior: "classical"`, and the file's `sha256`. Only these two
+reviewed external sources are accepted:
+
+- `Stash-HTTPDNS-Block`: `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/BlockHttpDNS/BlockHttpDNS.list`
+- `Stash-HTTPDNS-Loon-Extra`: `https://raw.githubusercontent.com/SchweppesSoda/CustomRules/master/Stash/Rules/HTTPDNS.Loon-Extra.list`
+
+The caller obtains those public snapshots explicitly; the auditor never fetches
+them. Keep snapshots and the mapping in temporary output, not in this skill.
+Unavailable inputs, missing policy/matcher fields, unknown rule types, compound
+artifact syntax and unreviewed external sources return incomplete coverage (exit
+2). Empty external HTTPDNS snapshots are incomplete even with a matching hash;
+only a manifest-declared NonIP/Address partition side may be empty. Fully
+observed type, hash or order violations return failure (exit 1). Exit 0
+requires all requested checks and the six canonical profiles to be complete.
+`--policy` filters the displayed references, not the shared content/order gates.
 
 ## Mihomo Kernel Validation Contract
 
@@ -140,6 +217,8 @@ reported verification limit, not a reason to run unrelated tests.
 ## Common Policy Targets
 
 - Hard-coded: `DIRECT`, `REJECT`.
+- Mihomo/Stash top-level inline proxy names are also valid rule targets in the
+  same profile; a rule does not have to point to a proxy group.
 - Core: `Proxy`, `MyProxy`, `MyDirect`, `Domestic`, `Final`.
 - High-priority service: `AI Suite`, `PayPal`, `Banking`, `Crypto`.
 - Service: `Telegram`, `YouTube`, `Netflix`, `Apple Push`, `Apple`, `Microsoft`, `HTTPDNS`, `Speedtest`.
