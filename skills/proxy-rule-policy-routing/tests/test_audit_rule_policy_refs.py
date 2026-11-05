@@ -44,6 +44,61 @@ class RulePolicyAuditTests(unittest.TestCase):
             self.assertEqual(payload["missing"], [])
             self.assertEqual(payload["skipped"], [])
 
+    def test_dns_bootstrap_requires_exact_owned_host_projection(self) -> None:
+        config = """dns:
+  nameserver-policy:
+    # BEGIN AUTO-GENERATED PROVIDER-COMPAT DNS
+    # Example
+    "+.example.net": [https://9.9.9.9:2443/private-path, https://dns.example.net/query]
+    # END AUTO-GENERATED PROVIDER-COMPAT DNS
+rules:
+  # BEGIN AUTO-GENERATED PROVIDER-COMPAT EGRESS
+  - IP-CIDR,9.9.9.9/32,DIRECT,no-resolve
+  - DOMAIN,dns.example.net,DIRECT
+  # END AUTO-GENERATED PROVIDER-COMPAT EGRESS
+  - DOMAIN,example.com,DIRECT
+  - MATCH,Final
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "Stash").mkdir()
+            path = root / "Stash/AutoStash.yaml"
+            path.write_text(config)
+            refs = audit.extract_mihomo_rules(root, "Stash", path)
+            self.assertEqual([r.bootstrap_dns for r in refs], [True, True, False, False])
+            self.assertEqual(audit.classify_rule(refs[0]), (10, "HardLocal"))
+            self.assertEqual(audit.provider_dns_bootstrap(path)[1], "")
+            bad_configs = [
+                config.replace("9.9.9.9/32", "9.9.9.0/24"),
+                config.replace("9.9.9.9/32", "8.8.8.8/32"),
+                config.replace("DIRECT,no-resolve", "Proxy,no-resolve"),
+                config.replace(",no-resolve", ""),
+                config.replace("  - DOMAIN,dns.example.net,DIRECT\n", ""),
+                config.replace("  nameserver-policy:", "  unrelated:"),
+                config.replace("  # END AUTO-GENERATED PROVIDER-COMPAT EGRESS", ""),
+                config.replace("    # END AUTO-GENERATED PROVIDER-COMPAT DNS", "    # END AUTO-GENERATED PROVIDER-COMPAT DNS\n    # END AUTO-GENERATED PROVIDER-COMPAT DNS"),
+                config.replace("rules:\n", "rules:\n  - DOMAIN,earlier.example,Proxy\n"),
+            ]
+            for text in bad_configs:
+                path.write_text(text)
+                lines, error = audit.provider_dns_bootstrap(path)
+                self.assertEqual(lines, set())
+                self.assertTrue(error)
+                self.assertNotIn("private-path", error)
+                self.assertTrue(audit.audit(root, [])["provider_dns_bootstrap_violations"])
+            # Public DIRECT rules outside owned markers receive no exception.
+            path.write_text("rules:\n  - IP-CIDR,9.9.9.9/32,DIRECT,no-resolve\n")
+            ref = audit.extract_mihomo_rules(root, "Stash", path)[0]
+            self.assertEqual(audit.classify_rule(ref), (150, "ServiceAddress"))
+
+    def test_private_source_special_ranges_do_not_expand_inline_local_exception(self) -> None:
+        for network in audit.PRIVATE_SOURCE_SPECIAL_NETWORKS:
+            value = str(network)
+            self.assertTrue(audit.is_reviewed_private_network(value))
+            self.assertFalse(audit.is_local_network(value))
+        for value in ("8.8.8.0/24", "192.31.0.0/16", "2000::/3", "0.0.0.0/0", "::/0"):
+            self.assertFalse(audit.is_reviewed_private_network(value))
+
     def test_each_active_canonical_profile_remains_required(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)

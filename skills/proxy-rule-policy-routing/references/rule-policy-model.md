@@ -214,6 +214,25 @@ An explicit `--config` remains required even if the selected file is missing.
 Use the broader default mode only when needed. Missing tooling is a
 reported verification limit, not a reason to run unrelated tests.
 
+## Bootstrap and Private source exceptions
+
+Stash's leading Provider Compatibility EGRESS block bootstraps the dedicated
+DNS endpoints. It is checked against the DNS block in `dns.nameserver-policy`:
+only the exact resolver-host DOMAIN/DIRECT or IPv4 /32/DIRECT/no-resolve
+projection is exempt from service-address ordering. Both marker pairs, field
+placement and complete membership must match. An arbitrary public DIRECT rule,
+broader subnet or marker label alone does not qualify.
+
+The reviewed Private sources intentionally include special-purpose ranges as
+well as LAN addresses. The auditor keeps a separate exact-prefix allowance for
+AS112, AMT, NAT64, discard, IETF protocol assignments, documentation and segment
+routing SIDs present in those sources. These are defined by the [IANA IPv4
+registry](https://www.iana.org/assignments/iana-ipv4-special-registry/) and [IANA
+IPv6 registry](https://www.iana.org/assignments/iana-ipv6-special-registry/).
+Some are globally reachable; this source exception does not classify them as
+private or authorize arbitrary inline early-direct rules. Unreviewed prefixes,
+supernets and ASN entries still fail content validation.
+
 ## Common Policy Targets
 
 - Hard-coded: `DIRECT`, `REJECT`.

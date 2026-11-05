@@ -67,6 +67,15 @@ LOCAL_NETWORKS = tuple(ipaddress.ip_network(value) for value in (
     "192.168.0.0/16", "192.88.99.0/24", "198.18.0.0/15", "198.51.100.0/24",
     "203.0.113.0/24", "224.0.0.0/3", "::/127", "fc00::/7", "fe80::/10", "ff00::/8",
 ))
+# The upstream Private source also contains reviewed special-purpose ranges.
+# Keep these separate from LAN/inline exceptions: some are globally reachable.
+# IANA IPv4/IPv6 Special-Purpose Address Registries (see rule-policy-model.md).
+PRIVATE_SOURCE_SPECIAL_NETWORKS = frozenset(ipaddress.ip_network(value) for value in (
+    "192.31.196.0/24", "192.52.193.0/24",  # AS112 and AMT
+    "64:ff9b::/96", "64:ff9b:1::/48", "100::/64",  # translation / discard
+    "2001::/23", "2001:db8::/32", "2620:4f:8000::/48",  # IETF / documentation / AS112
+    "3fff::/20", "5f00::/16",  # documentation / segment routing SIDs
+))
 HTTPDNS_SOURCES = {
     "Stash-HTTPDNS-Block": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/BlockHttpDNS/BlockHttpDNS.list",
     "Stash-HTTPDNS-Loon-Extra": "https://raw.githubusercontent.com/SchweppesSoda/CustomRules/master/Stash/Rules/HTTPDNS.Loon-Extra.list",
@@ -97,6 +106,7 @@ class RuleRef:
     text: str
     source: str = ""
     behavior: str = ""
+    bootstrap_dns: bool = False
     content_kind: str = ""
     content_value: str = ""
     artifact: str = ""
@@ -387,6 +397,70 @@ def extract_egern_rules(repo: Path, path: Path) -> list[RuleRef]:
     return refs
 
 
+def provider_dns_bootstrap(path: Path) -> tuple[set[int], str]:
+    """Recognize only the exact Stash egress projection of dedicated DNS hosts.
+
+    Marker names alone never authorize a public DIRECT rule. The two owned
+    blocks must be in their proper fields, and all egress entries must match
+    the DNS host projection. Errors contain no private resolver paths.
+    """
+    lines = read_lines(path)
+    labels = ("AUTO-GENERATED PROVIDER-COMPAT DNS", "AUTO-GENERATED PROVIDER-COMPAT EGRESS")
+    if not any(label in line for label in labels for line in lines):
+        return set(), ""
+    try:
+        blocks = []
+        for label, indent in zip(labels, ("    ", "  ")):
+            begin, end = "# BEGIN " + label, "# END " + label
+            starts = [i for i, line in enumerate(lines) if line.strip() == begin]
+            ends = [i for i, line in enumerate(lines) if line.strip() == end]
+            if len(starts) != 1 or len(ends) != 1:
+                raise ValueError
+            start, stop = starts[0], ends[0]
+            if start >= stop or lines[start] != indent + begin or lines[stop] != indent + end:
+                raise ValueError
+            blocks.append((start, stop))
+        (dns_start, dns_end), (egress_start, egress_end) = blocks
+        # A block belongs to the last preceding field at the relevant indent.
+        top = lambda pos: next((line for line in reversed(lines[:pos]) if line and not line.startswith((" ", "#"))), "")
+        field = next((line for line in reversed(lines[:dns_start]) if re.match(r"^  [^ #]", line)), "")
+        if (top(dns_start) != "dns:" or field != "  nameserver-policy:"
+                or top(dns_end) != "dns:" or top(egress_start) != "rules:"
+                or top(egress_end) != "rules:"):
+            raise ValueError
+        if any(line.strip().startswith("- ") for line in lines[lines.index("rules:")+1:egress_start]):
+            raise ValueError
+        hosts = set()
+        for line in lines[dns_start+1:dns_end]:
+            if line.startswith("    # "):
+                continue
+            match = re.fullmatch(r'    "\+\.[a-z0-9.-]+": \[(.+)\]', line)
+            if not match:
+                raise ValueError
+            for url in match.group(1).split(", "):
+                parsed = urlsplit(url)
+                if (parsed.scheme not in {"https", "udp"} or not parsed.hostname
+                        or parsed.username or parsed.password or parsed.query or parsed.fragment):
+                    raise ValueError
+                host = parsed.hostname
+                if not re.fullmatch(r"[a-z0-9.-]+", host):
+                    raise ValueError
+                hosts.add(host)
+        expected = []
+        for host in sorted(hosts):
+            try:
+                address = ipaddress.IPv4Address(host)
+            except ValueError:
+                expected.append(f"  - DOMAIN,{host},DIRECT")
+            else:
+                expected.append(f"  - IP-CIDR,{address}/32,DIRECT,no-resolve")
+        if lines[egress_start+1:egress_end] != expected:
+            raise ValueError
+        return set(range(egress_start+2, egress_end+1)), ""
+    except (ValueError, StopIteration):
+        return set(), "provider DNS bootstrap markers or host projection do not match"
+
+
 def extract_mihomo_rules(
     repo: Path, client: str, path: Path
 ) -> list[RuleRef]:
@@ -432,6 +506,9 @@ def extract_mihomo_rules(
         else:
             refs.append(RuleRef(client, rel(path, repo), index, "",
                 parts[1] if len(parts) > 1 else "", parts[0] if parts else "UNKNOWN", stripped))
+    if client == "Stash":
+        bootstrap_lines, _ = provider_dns_bootstrap(path)
+        refs = [replace(item, bootstrap_dns=item.line in bootstrap_lines) for item in refs]
     return refs
 
 
@@ -630,6 +707,15 @@ def is_company_rule(item: RuleRef) -> bool:
     return is_local_composite(item)
 
 
+def is_reviewed_private_network(value: str) -> bool:
+    if is_local_network(value):
+        return True
+    try:
+        return ipaddress.ip_network(value.split(",", 1)[0], strict=True) in PRIVATE_SOURCE_SPECIAL_NETWORKS
+    except ValueError:
+        return False
+
+
 def is_private_source(item: RuleRef) -> bool:
     name = source_name(item).casefold()
     return item.policy == "DIRECT" and name in {
@@ -674,7 +760,8 @@ def classify_rule(item: RuleRef) -> tuple[int, str] | None:
     if rule_kind(item) in {"FINAL", "DEFAULT", "MATCH"}:
         return 170, "Final"
     if (
-        rule_kind(item) == "SSID"
+        item.bootstrap_dns
+        or rule_kind(item) == "SSID"
         or is_private_source(item)
         or is_company_rule(item)
         or (not item.content_kind and item.policy == "DIRECT" and rule_kind(item) in {"IP-CIDR", "IP-CIDR6"} and is_local_network(item.rule))
@@ -1320,8 +1407,8 @@ def audit_artifact_contents(
                 elif item.behavior == "ipcidr" and member.kind not in {"IP-CIDR", "IP-CIDR6"}:
                     reason = "ipcidr provider contains a non-CIDR rule"
                 elif address and is_private_source(item):
-                    if member.kind == "IP-ASN" or not is_local_network(member.value):
-                        reason = "Private exception contains a public or ASN address rule"
+                    if member.kind == "IP-ASN" or not is_reviewed_private_network(member.value):
+                        reason = "Private exception contains an unreviewed public or ASN address rule"
                 elif address and is_special_source(item):
                     if normalized_rel(item.file) not in FULL_ORDER_FILES or member.kind != "IP-CIDR" or member.value.split(",")[0] != "100.64.0.0/10":
                         reason = "Special exception is limited to full-profile 100.64.0.0/10"
@@ -1396,6 +1483,12 @@ def audit(repo: Path, filters: list[str], artifact_root: Path | None = None, ext
     type_violations = audit_provider_types(providers, refs)
     cn_violations = audit_cn_guards(refs)
     final_violations = audit_final_catchalls(repo, refs)
+    bootstrap_violations = []
+    for name in CLIENT_FILES["Stash"]:
+        if (repo / name).is_file():
+            _, error = provider_dns_bootstrap(repo / name)
+            if error:
+                bootstrap_violations.append(CheckViolation("Stash", name, 0, "Provider DNS", error))
     content_checked: list[dict[str, object]] = []
     content_incomplete: list[CheckViolation] = []
     content_violations: list[CheckViolation] = []
@@ -1439,6 +1532,7 @@ def audit(repo: Path, filters: list[str], artifact_root: Path | None = None, ext
         "provider_type_violations": [asdict(item) for item in type_violations],
         "cn_guard_violations": [asdict(item) for item in cn_violations],
         "final_catchall_violations": [asdict(item) for item in final_violations],
+        "provider_dns_bootstrap_violations": [asdict(item) for item in bootstrap_violations],
         "artifact_content_checked": content_checked,
         "artifact_content_incomplete": [asdict(item) for item in content_incomplete],
         "artifact_content_violations": [asdict(item) for item in content_violations],
@@ -1475,6 +1569,7 @@ def print_report(payload: dict[str, object]) -> None:
     print_items(payload, "provider_type_violations", "Provider type violations")
     print_items(payload, "cn_guard_violations", "CN guard violations")
     print_items(payload, "final_catchall_violations", "Final catch-all violations")
+    print_items(payload, "provider_dns_bootstrap_violations", "Provider DNS bootstrap violations")
     print_items(payload, "artifact_content_incomplete", "Incomplete artifact content checks")
     print_items(payload, "artifact_content_violations", "Artifact content violations")
     print_items(payload, "expanded_order_violations", "Expanded content order violations")
@@ -1524,6 +1619,7 @@ def main(argv: list[str]) -> int:
         "final_catchall_violations",
         "artifact_content_violations",
         "expanded_order_violations",
+        "provider_dns_bootstrap_violations",
     ]
     if payload["missing"] or payload["artifact_content_incomplete"]:
         return 2
