@@ -827,14 +827,14 @@ def classify_rule(item: RuleRef) -> tuple[int, str] | None:
         return 92, "CNMainlandTV"
     if "microsoftcn" in flat or "metamicrosoftcn" in flat:
         return 100, "MicrosoftCN"
-    if "microsoft" in flat:
-        return 101, "Microsoft"
-    if "scholarglobal" in flat or policy_flat == "scholar":
-        return 102, "ScholarGlobal"
-    if "googlefcm" in flat:
-        return 103, "GoogleFCM"
     if "github" in flat:
-        return 104, "GitHub"
+        return 101, "GitHub"
+    if "microsoft" in flat:
+        return 102, "Microsoft"
+    if "scholarglobal" in flat or policy_flat == "scholar":
+        return 103, "ScholarGlobal"
+    if "googlefcm" in flat:
+        return 104, "GoogleFCM"
     if "googleglobal" in flat or source_name(item).casefold().endswith("classical/google"):
         return 105, "GoogleGlobal"
     if "steamcn" in flat or "metasteamcn" in flat:

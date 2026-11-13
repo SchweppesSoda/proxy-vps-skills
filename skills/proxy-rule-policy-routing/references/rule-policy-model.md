@@ -45,8 +45,8 @@ order.
 7. `Emby`, `YouTube`, `Spotify`, `Netflix`, `Disney`.
 8. Apple block: Apple Push domains; Apple TV/Music/News; Apple CN; Apple.
 9. Regional media block: `Asian TV`, `Global TV`, `CN Mainland TV`.
-10. Platform/tool block: Microsoft CN; Microsoft; Scholar Global; Google FCM;
-    GitHub; Google Global; Steam CN; GameDownload CN; GameDownload; Steam;
+10. Platform/tool block: Microsoft CN; GitHub; Microsoft; Scholar Global;
+    Google FCM; Google Global; Steam CN; GameDownload CN; GameDownload; Steam;
     Speedtest.
 11. Broad non-CN/global proxy domains.
 12. Narrow domestic services: AI CN; Scholar CN; WeChat/NetEase/Tencent and
@@ -64,6 +64,10 @@ order.
 Apple precedes regional TV so narrow Apple TV rules cannot be absorbed by a
 broad global-media list. Within regional TV, Asian TV precedes Global TV and
 CN Mainland TV remains the last media family.
+
+GitHub routes to `Proxy` before the general Microsoft set because the upstream
+Microsoft list includes GitHub domains. The Microsoft CN guard keeps its earlier
+`Domestic` position.
 
 The non-address segment includes DOMAIN, DOMAIN-SUFFIX, DOMAIN-KEYWORD,
 DOMAIN-WILDCARD, USER-AGENT, PROCESS-NAME and URL-REGEX. Preserve their literal
