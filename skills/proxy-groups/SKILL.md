@@ -10,6 +10,7 @@ Start from the requested provider/group and its direct consumers. Resolve the ac
 ## Route
 
 - Source URL/path/collection update, add/split, rename/delete, or unfamiliar client shape: read the relevant section of [group model](references/proxyconfig-group-model.md).
+- For panel order, regional probes or business menus, start with the active repository's `Operations/Maintenance/client-boundaries.md` and the [ordered group guidance](references/proxyconfig-group-model.md#ordered-groups-and-probes). Apply the current Safe/Lite and provider exceptions.
 - A visible policy rename with rule consumers also needs `proxy-rule-policy-routing`; a source hostname that is a node-resolution input also needs `proxy-dns-routing`.
 - A changed owned marker, derivative, writer input requiring regeneration, or publication needs `proxy-generated-config-sync`. Merely sharing a file with a writer does not.
 

@@ -5,8 +5,8 @@
 - Mihomo profiles are discovered under `Mihomo/`; the active canonical inputs
   include `AutoMihomo.Mobile.yaml` and `AutoMihomo.OpenWrt.yaml`, while
   `SafeMihomo.yaml` may intentionally be minimal.
-- Stash, Loon, and Egern each have their own provider and policy shapes. Do
-  not infer parity from a matching display name.
+- Stash and both Egern profiles have distinct provider and policy shapes.
+  Loon remains available in history only.
 
 ## Identity graph
 
@@ -28,9 +28,29 @@ merged.
   and rule consumers.
 - Egern: `policy_groups` and `external` provider pools use Egern-specific
   filters and `auto_test`/`fallback` semantics.
-- Loon Full: provider and policy sections can intentionally differ from
-  other clients. Loon Lite is retired and is not a maintained group or rule
-  consumer; do not recreate its configuration when synchronizing groups.
+
+## Ordered groups and probes
+
+Use the current repository contract for the panel, business candidates, regional
+timings and SNTP rate filters. Check both the displayed group order and the order
+of each selector's candidates. The first candidate sets the fresh-import
+default. An airport's automatic region and a cross-airport automatic group test
+different sets of exits.
+
+In Mihomo and Stash, give identical ordered lists a shared YAML sequence
+anchor. Each business still has its own selector. For probe options, compose
+mapping anchors from distinct fields so the repository's strict YAML loader
+can reject duplicate keys. A sequence alias supplies the whole list. YAML
+does not splice one sequence into another. Keep lists with different defaults,
+regional restrictions or tail choices distinct. Use native expanded policies in
+Egern while its maintained profile readers require alias-free YAML.
+
+Validate the resolved membership, timing units and provider filters for each
+affected client. For a geographic split, check the final egress on representative
+leaf names containing more than one location. When a published leaf embeds an
+old front-hop name, trace its exact artifact variant and keep that route working
+through the rename. The shared subscription identity and cache may outlive the
+visible name.
 
 ## Operation checklist
 
