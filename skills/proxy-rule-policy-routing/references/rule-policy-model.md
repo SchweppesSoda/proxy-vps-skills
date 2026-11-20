@@ -61,6 +61,13 @@ order.
 16. Broad CN IP, ASN, and GEOIP, including `Address/Classical/China`.
 17. Exactly one final catch-all, last, routed to `Final`.
 
+When splitting a service out of the general AI group, trace the aggregate’s
+reviewed compatibility supplements. Place the service domains and its precise
+supplement ahead of the aggregate. For Google Gemini, the verification redirect
+and app endpoints share the service exit. Check ordinary searches on the shared
+verification host and the separate cryptocurrency exchange against their intended
+policies in each client.
+
 Apple precedes regional TV so narrow Apple TV rules cannot be absorbed by a
 broad global-media list. Within regional TV, Asian TV precedes Global TV and
 CN Mainland TV remains the last media family.

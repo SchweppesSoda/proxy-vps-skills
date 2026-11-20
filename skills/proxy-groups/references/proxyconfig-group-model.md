@@ -47,7 +47,8 @@ Egern while its maintained profile readers require alias-free YAML.
 
 Validate the resolved membership, timing units and provider filters for each
 affected client. For a geographic split, check the final egress on representative
-leaf names containing more than one location. When a published leaf embeds an
+leaf names containing more than one location. Check each landing group’s allowed
+front-hop regions separately from its exit filter. When a published leaf embeds an
 old front-hop name, trace its exact artifact variant and keep that route working
 through the rename. The shared subscription identity and cache may outlive the
 visible name.
