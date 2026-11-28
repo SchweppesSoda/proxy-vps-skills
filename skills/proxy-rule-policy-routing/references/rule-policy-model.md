@@ -107,6 +107,18 @@ SafeMihomo keeps its existing minimal features. Its tail is: global non-address,
 domestic non-address, any already-enabled service addresses, Proxy IP, China IP,
 Final. Applying this order does not add missing services to Safe or Lite.
 
+## Mihomo source-IP selectors
+
+`SRC-IP-CIDR,192.0.2.10/32,Device egress` matches connections from one IPv4
+address. Use `/128` for one IPv6 address. Both families also accept subnet
+prefixes. The content audit checks the numeric CIDR prefix. The reference audit
+checks that the target resolves in the same Mihomo profile. Choosing `PASS`
+in the target group lets matching connections continue to the next rule.
+
+The profile owns the placement of each source rule and the group's candidates
+and default. Its tests should cover those choices. Destination-service ordering
+uses the surrounding destination rules. The final catch-all must still be last.
+
 ## Finance Precedence Contract
 
 The active rule sequence immediately after the last AI non-address rule,

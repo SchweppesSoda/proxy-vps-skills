@@ -10,6 +10,7 @@ Start with the changed rule/provider/target and neighboring precedence blocks. A
 ## Route
 
 - Adding, removing, reordering or remapping rules: read the relevant sections of [rule policy model](references/rule-policy-model.md) for ordering, source format and profile exceptions.
+- For Mihomo [source-IP selectors](references/rule-policy-model.md#mihomo-source-ip-selectors), check the prefix and target. Keep device bindings and their priority in the owning profile's tests.
 - Creating/deleting/renaming a group also uses `proxy-groups`; remapping to an existing group stays here.
 - Changing a generated scope or source→artifact publication uses `proxy-generated-config-sync`. An existing published URL does not by itself require a publication workflow.
 

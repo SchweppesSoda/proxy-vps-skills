@@ -594,6 +594,10 @@ def rule_kind(item: RuleRef) -> str:
     return (item.content_kind or item.kind).upper().replace("_", "-")
 
 
+def is_mihomo_source_cidr(item: RuleRef) -> bool:
+    return item.client == "Mihomo" and item.kind.upper() == "SRC-IP-CIDR"
+
+
 def source_name(item: RuleRef) -> str:
     value = unquote(item.source or item.rule)
     if value.startswith(("http://", "https://")):
@@ -613,6 +617,8 @@ def rule_blob(item: RuleRef) -> tuple[str, str]:
 
 
 def logical_service(item: RuleRef) -> str:
+    if is_mihomo_source_cidr(item):
+        return "SRC-IP-CIDR"
     _, flat = rule_blob(item)
     if is_ip_rule(item):
         return classify_address(item)[1]
@@ -629,7 +635,7 @@ def logical_service(item: RuleRef) -> str:
 
 def is_ip_rule(item: RuleRef) -> bool:
     readable, flat = rule_blob(item)
-    if item.content_kind:
+    if item.content_kind or is_mihomo_source_cidr(item):
         return rule_kind(item) in ADDRESS_TYPES | {"GEOIP"}
     if rule_kind(item) in ADDRESS_TYPES | {"GEOIP"} or item.behavior == "ipcidr":
         return True
@@ -754,6 +760,8 @@ def classify_address(item: RuleRef) -> tuple[int, str]:
 
 
 def classify_rule(item: RuleRef) -> tuple[int, str] | None:
+    if is_mihomo_source_cidr(item):
+        return None
     readable, flat = rule_blob(item)
     policy_flat = flat_text(item.policy)
 
@@ -1117,6 +1125,8 @@ def audit_provider_types(
 def audit_cn_guards(refs: list[RuleRef]) -> list[CheckViolation]:
     violations: list[CheckViolation] = []
     for item in refs:
+        if is_mihomo_source_cidr(item):
+            continue
         readable, flat = rule_blob(item)
         for service, tokens in CN_GUARDS.items():
             if any(token in flat or token in readable for token in tokens):
@@ -1182,6 +1192,15 @@ def custom_artifact_path(url: str) -> str | None:
     if any(part in {"", ".", ".."} for part in remaining) or any("\\" in part for part in remaining):
         raise ValueError("unsafe artifact path")
     return "/".join(remaining)
+
+
+def valid_source_cidr(value: str) -> bool:
+    try:
+        network = ipaddress.ip_network(value, strict=False)
+    except ValueError:
+        return False
+    # Mihomo requires a numeric prefix length and an unscoped address.
+    return "%" not in value and value.endswith(f"/{network.prefixlen}")
 
 
 def validate_artifact_rule(kind: str, value: str) -> None:
@@ -1294,7 +1313,10 @@ def audit_artifact_contents(
             incomplete.append(CheckViolation(item.client, item.file, item.line, subject or item.kind, "active rule has no parsed matcher"))
         if item.kind not in {"RULE-SET", "RULE_SET", "REMOTE-RULE"}:
             kind = rule_kind(item)
-            if kind not in INLINE_TYPES and not is_company_rule(item):
+            if is_mihomo_source_cidr(item):
+                if not valid_source_cidr(item.rule):
+                    incomplete.append(CheckViolation(item.client, item.file, item.line, subject, "invalid SRC-IP-CIDR prefix"))
+            elif kind not in INLINE_TYPES and not is_company_rule(item):
                 incomplete.append(CheckViolation(item.client, item.file, item.line, subject, f"unsupported active inline type {kind}"))
             elif kind in ADDRESS_TYPES:
                 try:
@@ -1470,6 +1492,7 @@ def audit(repo: Path, filters: list[str], artifact_root: Path | None = None, ext
         item
         for item in refs
         if item.policy not in BUILT_INS
+        and not (item.client == "Mihomo" and item.policy == "PASS")
         and item.policy not in defs_by_scope.get(policy_scope(item.client, item.file), set())
     ]
     finance_violations = audit_finance_order(repo, refs)

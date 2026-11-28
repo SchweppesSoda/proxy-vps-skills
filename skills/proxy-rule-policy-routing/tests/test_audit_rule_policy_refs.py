@@ -326,6 +326,24 @@ rules:
             self.assertEqual(payload["undefined_rule_policies"], [])
             self.assertEqual(payload["validation_scope"]["mode"], "references-only")
 
+    def test_mihomo_source_cidr_resolves_the_target_in_its_own_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            self.make_repo(repo)
+            (repo / "Mihomo/AutoMihomo.Mobile.yaml").write_text(
+                "proxy-groups:\n  - name: Mobile only\n", encoding="utf-8")
+            (repo / "Mihomo/AutoMihomo.OpenWrt.yaml").write_text("""proxy-groups:
+  - name: Device egress
+    type: select
+    proxies: [PASS, DIRECT]
+rules:
+  - SRC-IP-CIDR,192.0.2.10/32,Device egress
+  - SRC-IP-CIDR,2001:db8::10/128,PASS
+  - SRC-IP-CIDR,198.51.100.0/24,Mobile only
+""", encoding="utf-8")
+            undefined = audit.audit(repo, [])["undefined_rule_policies"]
+            self.assertEqual([item["policy"] for item in undefined], ["Mobile only"])
+
 
 class ArtifactContentAuditTests(unittest.TestCase):
     BASE = "https://raw.githubusercontent.com/SchweppesSoda/CustomRules/refs/heads/auto-build/"
@@ -405,6 +423,48 @@ class ArtifactContentAuditTests(unittest.TestCase):
             expanded, _, incomplete, violations = audit.audit_artifact_contents([ip, provider], root)
             self.assertEqual((incomplete, violations), ([], []))
             self.assertTrue(audit.audit_canonical_order(repo, expanded))
+
+    def test_mihomo_source_cidr_keeps_destination_order_and_final_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            file = "Mihomo/AutoMihomo.OpenWrt.yaml"
+            repo = self.order_repo(root, file)
+            path = repo / file
+            path.write_text("""rules:
+  - SRC-IP-CIDR,192.0.2.10/32,PayPal
+  - DOMAIN,ai.example,AI Suite
+  - DOMAIN,paypal.example,PayPal
+  - DOMAIN,banking.example,Banking
+  - DOMAIN,crypto.example,Crypto
+  - IP-CIDR,203.0.113.0/24,Proxy
+  - src-ip-cidr,2001:db8::42/64,AI Suite
+  - SRC-IP-CIDR,198.51.100.64/26,MicrosoftCN
+  - MATCH,Final
+""", encoding="utf-8")
+            (root / "manifest.json").write_text('{"schema":2,"sets":{}}', encoding="utf-8")
+            refs = audit.extract_mihomo_rules(repo, "Mihomo", path)
+            expanded, _, incomplete, violations = audit.audit_artifact_contents(refs, root)
+            self.assertEqual((expanded, incomplete, violations), (refs, [], []))
+            self.assertEqual(audit.audit_finance_order(repo, refs), [])
+            self.assertEqual(audit.audit_cn_guards(refs), [])
+            self.assertEqual(audit.audit_canonical_order(repo, expanded), [])
+            self.assertTrue(audit.audit_canonical_order(repo, [*expanded, expanded[0]]))
+
+    def test_source_cidr_rejects_invalid_prefixes_and_unsupported_inline_forms(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "manifest.json").write_text('{"schema":2,"sets":{}}', encoding="utf-8")
+            ref = audit.RuleRef("Mihomo", "Mihomo/AutoMihomo.OpenWrt.yaml", 1, "DIRECT",
+                                "192.0.2.10/32", "SRC-IP-CIDR", "fixture")
+            for value in ("", "not-an-ip/24", "192.0.2.10", "192.0.2.10/33", "192.0.2.10/032",
+                          "192.0.2.10/255.255.255.0", "2001:db8::1/129", "fe80::1%eth0/64"):
+                with self.subTest(value=value):
+                    _, _, incomplete, _ = audit.audit_artifact_contents([replace(ref, rule=value)], root)
+                    self.assertIn("invalid SRC-IP-CIDR prefix", [item.reason for item in incomplete])
+            for other in (replace(ref, client="Stash"), replace(ref, kind="SRC_IP_CIDR")):
+                with self.subTest(client=other.client, kind=other.kind):
+                    _, _, incomplete, _ = audit.audit_artifact_contents([other], root)
+                    self.assertTrue(any("unsupported active inline type" in item.reason for item in incomplete))
 
     def test_mixed_classical_early_address_cannot_hide_in_business_provider(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -546,7 +606,8 @@ class ArtifactContentAuditTests(unittest.TestCase):
             self.assertTrue(incomplete)
 
     def test_unknown_or_compound_artifact_syntax_is_incomplete(self) -> None:
-        for rule in ("UNKNOWN,fixture", "AND,((DOMAIN,fixture.invalid),(IP-CIDR,8.8.8.0/24))"):
+        for rule in ("UNKNOWN,fixture", "AND,((DOMAIN,fixture.invalid),(IP-CIDR,8.8.8.0/24))",
+                     "SRC-IP-CIDR,192.0.2.10/32"):
             with self.subTest(rule=rule), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 self.write_set(root, "NonIP/Classical/OpenAI", [rule])
